@@ -20,7 +20,7 @@ ifeq ($(OS), Windows_NT)
     # Windows-specific flags
     # Example for MinGW
     CC      = x86_64-w64-mingw32-gcc
-    CFLAGS  += -IC:/SDL2/include
+    CFLAGS  += -IC:/SDL2/include/SDL2
     LDFLAGS += -LC:/SDL2/lib -lSDL2 -lSDL2_ttf
 endif
 
