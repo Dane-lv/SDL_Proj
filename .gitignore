@@ -1,0 +1,6 @@
+#git doesnt track these
+*.o
+game
+*.log
+*.tmp
+build/
