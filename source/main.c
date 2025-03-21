@@ -38,7 +38,10 @@ bool initSDL(SDL_App *app) {
     return true;
 }
 
-int main(){
+int main(int argc, char *argv[]){
+    (void)argc;
+    (void)argv;
+    
     SDL_App app;
 
     if (!initSDL(&app)) {

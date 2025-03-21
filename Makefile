@@ -18,10 +18,10 @@ endif
 # If the environment variable OS is set to Windows_NT, we assume Windows
 ifeq ($(OS), Windows_NT)
     # Windows-specific flags
-    # Example for MinGW
-    CC      = x86_64-w64-mingw32-gcc
-    CFLAGS  += -IC:/SDL2/include/SDL2
-    LDFLAGS += -LC:/SDL2/lib -lSDL2 -lSDL2_ttf
+    # Using vcpkg installation
+    CC      = gcc
+    CFLAGS  += -IC:/vcpkg/installed/x64-windows/include -IC:/vcpkg/installed/x64-windows/include/SDL2
+    LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf
 endif
 
 SRCDIR = source
