@@ -28,7 +28,7 @@ endif
 # Apply macOS settings (if detected)
 ifeq ($(MACOS),1)
     CFLAGS  += -I/opt/homebrew/include/SDL2
-    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf
+    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf -lSDL2_image
 endif
 
 # Apply Linux settings (if detected)
@@ -42,7 +42,7 @@ ifeq ($(WINDOWS),1)
     ifneq ("$(wildcard C:/vcpkg/installed/x64-windows/include/SDL2)","")
         SDL2_FOUND = 1
         CFLAGS  += -IC:/vcpkg/installed/x64-windows/include -IC:/vcpkg/installed/x64-windows/include/SDL2
-        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf
+        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image
     endif
 endif
 
