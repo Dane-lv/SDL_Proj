@@ -52,7 +52,7 @@ ifeq ($(WINDOWS),1)
         ifneq ("$(wildcard C:/msys64/mingw64/include/SDL2)","")
             SDL2_FOUND = 1
             CFLAGS  += -IC:/msys64/mingw64/include -IC:/msys64/mingw64/include/SDL2
-            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf
+            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image
         endif
     endif
 endif
