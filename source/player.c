@@ -54,22 +54,22 @@ void updatePlayer(Player *pPlayer, float deltaTime)
 
 void movePlayerLeft(Player *pPlayer) {
     pPlayer->vx = -PLAYERSPEED;
-    pPlayer->vy = 0;
+    
 }
 
 void movePlayerRight(Player *pPlayer) {
     pPlayer->vx = +PLAYERSPEED;
-    pPlayer->vy = 0;
+
 }
 
 void movePlayerUp(Player *pPlayer) {
     pPlayer->vy = -PLAYERSPEED;
-    pPlayer->vx = 0; 
+    
 }
 
 void movePlayerDown(Player *pPlayer) {
     pPlayer->vy = +PLAYERSPEED;
-    pPlayer->vx = 0;
+    
 } 
 
 void stopMovementVY(Player *pPlayer)
