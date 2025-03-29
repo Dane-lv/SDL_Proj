@@ -2,11 +2,13 @@
 #include <SDL.h>
 #include <stdbool.h>
 #include "../include/constants.h"
+#include "../include/player.h"
 
 struct game {
     bool isRunning;
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
+    Player *pPlayer;
 };
 typedef struct game Game;
 
@@ -52,6 +54,14 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;    
     }
+
+    pGame->pPlayer = createPlayer(WINDOW_WIDTH/2,WINDOW_HEIGHT/2,pGame->pRenderer);
+    if(!pGame->pPlayer){
+        printf("Error: %s\n",SDL_GetError());
+        closeGame(pGame);
+        return false;
+    }
+    
     return true;
 }
 
@@ -102,15 +112,7 @@ void renderGame(Game *pGame)
 {
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
-
-    SDL_Rect rect;
-    rect.w = 32;
-    rect.h = 32;
-    rect.x = (WINDOW_WIDTH / 2) - 2;
-    rect.y = (WINDOW_HEIGHT / 2) - 2;
-
-    SDL_SetRenderDrawColor(pGame->pRenderer, 255, 255, 255, 255);
-    SDL_RenderFillRect(pGame->pRenderer, &rect);
+    drawPlayer(pGame->pPlayer);
 
     SDL_RenderPresent(pGame->pRenderer);
 }
