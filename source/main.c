@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
+#define NAWID
 
 struct game {
     bool isRunning;
