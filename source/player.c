@@ -1,103 +1,114 @@
-        #include <SDL.h>
-        #include <SDL_image.h>
-        #include "../include/player.h"
-        #include "../include/constants.h"
+#include <SDL.h>
+#include <SDL_image.h>
+#include <math.h>
+#include "../include/player.h"
+#include "../include/constants.h"
 
-        struct player
-        {
-            float x, y; //player movement math
-            float vy, vx;
-            float angle;
-            SDL_Renderer *pRenderer;
-            SDL_Texture *pTexture;
-            SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
-        }; 
+struct player
+{
+    float x, y; //player movement math
+    float vy, vx;
+    float angle;
+    SDL_Renderer *pRenderer;
+    SDL_Texture *pTexture;
+    SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
+}; 
 
-        Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
-        {
-            Player *pPlayer = malloc(sizeof(struct player));
-            pPlayer->x = x;
-            pPlayer->y = y;
-            pPlayer->vy = pPlayer->vx = 0;
-            pPlayer->angle = 0;
-            SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
-            if(!pSurface){
-                printf("Error: %s\n",SDL_GetError());
-                return NULL;
-            }
-            pPlayer->pRenderer = pRenderer;
-            pPlayer->pTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
-            SDL_FreeSurface(pSurface);
-            if(!pPlayer->pTexture){
-                printf("Error: %s\n",SDL_GetError());
-                return NULL;
-            }
-            pPlayer->playerRect.x = (int)pPlayer->x;
-            pPlayer->playerRect.y = (int)pPlayer->y;
-            pPlayer->playerRect.w = PLAYERWIDTH;
-            pPlayer->playerRect.h = PLAYERHEIGHT;
-          
-            return pPlayer;
-        }
+Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
+{
+    Player *pPlayer = malloc(sizeof(struct player));
+    pPlayer->x = x;
+    pPlayer->y = y;
+    pPlayer->vy = pPlayer->vx = 0;
+    pPlayer->angle = 0;
+    SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
+    if(!pSurface){
+        printf("Error: %s\n",SDL_GetError());
+        return NULL;
+    }
+    pPlayer->pRenderer = pRenderer;
+    pPlayer->pTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
+    SDL_FreeSurface(pSurface);
+    if(!pPlayer->pTexture){
+        printf("Error: %s\n",SDL_GetError());
+        return NULL;
+    }
+    pPlayer->playerRect.x = (int)pPlayer->x;
+    pPlayer->playerRect.y = (int)pPlayer->y;
+    pPlayer->playerRect.w = PLAYERWIDTH;
+    pPlayer->playerRect.h = PLAYERHEIGHT;
+  
+    return pPlayer;
+}
 
-        void drawPlayer(Player *pPlayer)
-        {
-            SDL_RenderCopyEx(pPlayer->pRenderer,pPlayer->pTexture,NULL,&(pPlayer->playerRect), pPlayer->angle, NULL, SDL_FLIP_NONE);
-        }
+void drawPlayer(Player *pPlayer)
+{
+    SDL_RenderCopyEx(pPlayer->pRenderer, pPlayer->pTexture, NULL, &(pPlayer->playerRect), pPlayer->angle + 90.0f, NULL, SDL_FLIP_NONE);
+}
 
-        void updatePlayer(Player *pPlayer, float deltaTime)
-        {
-            pPlayer->x += pPlayer->vx * deltaTime;
-            pPlayer->y += pPlayer->vy * deltaTime;
-            if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
-            if(pPlayer->y < 0) pPlayer->y = 0;
-            if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
-            if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
-            pPlayer->playerRect.x = (int)pPlayer->x;
-            pPlayer->playerRect.y = (int)pPlayer->y;
+void updatePlayer(Player *pPlayer, float deltaTime)
+{
+    pPlayer->x += pPlayer->vx * deltaTime;
+    pPlayer->y += pPlayer->vy * deltaTime;
+    
+    if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
+    if(pPlayer->y < 0) pPlayer->y = 0;
+    if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
+    if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
 
-            int mouseX, mouseY;
-            SDL_GetMouseState(&mouseX, &mouseY);
-            
-            int deltaX = mouseX - (pPlayer->x + pPlayer->playerRect.w/2);
-            int deltaY = mouseY - (pPlayer->y + pPlayer->playerRect.y/2);
-            float radians = atan2f(deltaY,deltaX);
-            pPlayer->angle = (radians * 180 / (float) M_PI) + 45;
-            
-        } 
+    pPlayer->playerRect.x = (int)pPlayer->x;
+    pPlayer->playerRect.y = (int)pPlayer->y;
 
-        void movePlayerLeft(Player *pPlayer) {
-            pPlayer->vx = -PLAYERSPEED;
-            
-        }
+    //current mouse position
+    int mouseX, mouseY;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    
+    //center of the player
+    float playerCenterX = pPlayer->playerRect.x + pPlayer->playerRect.w / 2.0f;
+    float playerCenterY = pPlayer->playerRect.y + pPlayer->playerRect.h / 2.0f;
+    
+    // angle between player and mouse cursor
+    float deltaX = mouseX - playerCenterX;
+    float deltaY = mouseY - playerCenterY;
+    //få vinkel (tan) i radianer
+    float radians = atan2f(deltaY, deltaX);
+    //radianer till grader
+    pPlayer->angle = radians * 180.0f / M_PI;
+    
+}
 
-        void movePlayerRight(Player *pPlayer) {
-            pPlayer->vx = +PLAYERSPEED;
+void movePlayerLeft(Player *pPlayer) {
+    pPlayer->vx = -PLAYERSPEED;
+    
+}
 
-        }
+void movePlayerRight(Player *pPlayer) {
+    pPlayer->vx = +PLAYERSPEED;
 
-        void movePlayerUp(Player *pPlayer) {
-            pPlayer->vy = -PLAYERSPEED;
-            
-        }
+}
 
-        void movePlayerDown(Player *pPlayer) {
-            pPlayer->vy = +PLAYERSPEED;
-            
-        } 
+void movePlayerUp(Player *pPlayer) {
+    pPlayer->vy = -PLAYERSPEED;
+    
+}
 
-        void stopMovementVY(Player *pPlayer)
-        {
-            pPlayer->vy = 0;   
-        }
+void movePlayerDown(Player *pPlayer) {
+    pPlayer->vy = +PLAYERSPEED;
+    
+} 
 
-        void stopMovementVX(Player *pPlayer)
-        {
-            pPlayer->vx = 0;   
-        }
+void stopMovementVY(Player *pPlayer)
+{
+    pPlayer->vy = 0;   
+}
+
+void stopMovementVX(Player *pPlayer)
+{
+    pPlayer->vx = 0;   
+}
 
 
-        void destroyPlayer(Player *pPlayer)
-        {
-            free(pPlayer);
-        }
+void destroyPlayer(Player *pPlayer)
+{
+    free(pPlayer);
+}
