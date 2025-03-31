@@ -10,7 +10,7 @@ struct player
     int angle;
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
-    SDL_Rect playerRect; //rect.x rect.y for rendering after movement math
+    SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
 }; 
 
 Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
@@ -48,6 +48,10 @@ void updatePlayer(Player *pPlayer, float deltaTime)
 {
     pPlayer->x += pPlayer->vx * deltaTime;
     pPlayer->y += pPlayer->vy * deltaTime;
+    if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
+    if(pPlayer->y < 0) pPlayer->y = 0;
+    if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
+    if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
 } 
