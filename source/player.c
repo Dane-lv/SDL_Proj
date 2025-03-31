@@ -5,13 +5,12 @@
 
 struct player
 {
-    float x;
-    float y;
-    float playerSpeed;
+    float x, y; //player movement math
+    float vy, vx;
     int angle;
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
-    SDL_Rect playerRect;
+    SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
 }; 
 
 Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
@@ -19,7 +18,8 @@ Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
     Player *pPlayer = malloc(sizeof(struct player));
     pPlayer->x = x;
     pPlayer->y = y;
-    pPlayer->playerSpeed = PLAYERSPEED;
+    pPlayer->vy = pPlayer->vx = 0;
+    pPlayer->angle = 0;
     SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
     if(!pSurface){
         printf("Error: %s\n",SDL_GetError());
@@ -42,4 +42,52 @@ Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
 void drawPlayer(Player *pPlayer)
 {
     SDL_RenderCopy(pPlayer->pRenderer,pPlayer->pTexture,NULL,&(pPlayer->playerRect));
+}
+
+void updatePlayer(Player *pPlayer, float deltaTime)
+{
+    pPlayer->x += pPlayer->vx * deltaTime;
+    pPlayer->y += pPlayer->vy * deltaTime;
+    if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
+    if(pPlayer->y < 0) pPlayer->y = 0;
+    if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
+    if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
+    pPlayer->playerRect.x = (int)pPlayer->x;
+    pPlayer->playerRect.y = (int)pPlayer->y;
+} 
+
+void movePlayerLeft(Player *pPlayer) {
+    pPlayer->vx = -PLAYERSPEED;
+    
+}
+
+void movePlayerRight(Player *pPlayer) {
+    pPlayer->vx = +PLAYERSPEED;
+
+}
+
+void movePlayerUp(Player *pPlayer) {
+    pPlayer->vy = -PLAYERSPEED;
+    
+}
+
+void movePlayerDown(Player *pPlayer) {
+    pPlayer->vy = +PLAYERSPEED;
+    
+} 
+
+void stopMovementVY(Player *pPlayer)
+{
+    pPlayer->vy = 0;   
+}
+
+void stopMovementVX(Player *pPlayer)
+{
+    pPlayer->vx = 0;   
+}
+
+
+void destroyPlayer(Player *pPlayer)
+{
+    free(pPlayer);
 }

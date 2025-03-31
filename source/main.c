@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
+#define NAWID
 
 struct game {
     bool isRunning;
@@ -16,7 +17,7 @@ bool initiateGame(Game *pGame);
 void closeGame(Game *pGame);
 void run(Game *pGame);
 void handleInput(Game *pGame, SDL_Event *pEvent);
-void updateGame(Game *pGame);
+void updateGame(Game *pGame, float deltaTime);
 void renderGame(Game *pGame);
 
 int main(int argc, char** argv)
@@ -39,7 +40,7 @@ bool initiateGame(Game *pGame)
         return false;
     }
 
-    pGame->pWindow = SDL_CreateWindow("Maze Mayham", SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH,WINDOW_HEIGHT,0);
+    pGame->pWindow = SDL_CreateWindow("Maze Mayhem", SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH,WINDOW_HEIGHT,0);
     if (!pGame->pWindow)
     {
         printf("Window Creation Error: %s\n", SDL_GetError());
@@ -69,8 +70,16 @@ void run(Game *pGame)
 {
     pGame->isRunning = true;
     SDL_Event event;
+
+    Uint32 lastTime = SDL_GetTicks(); //time of the first frame since SDl init
+    Uint32 currentTime; //time when the current frame started
+    float deltaTime; //move player by pixels in second instead of by frames in second
+
     while(pGame->isRunning)
     {
+        currentTime = SDL_GetTicks();
+        deltaTime = (currentTime - lastTime) / 1000.0f; //convert ms to seconds
+        lastTime = currentTime;
         while(SDL_PollEvent(&event))
         {
             if(event.type == SDL_QUIT)
@@ -80,11 +89,10 @@ void run(Game *pGame)
             else
             {
                 handleInput(pGame, &event);
-                updateGame(pGame);
-                renderGame(pGame);
-                SDL_Delay(1000 / 60 - 15);  
             }
         }
+        updateGame(pGame, deltaTime);
+        renderGame(pGame);
     }
 }
 
@@ -92,10 +100,42 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 {
     if(pEvent->type == SDL_KEYDOWN)
     {
-        switch(pEvent->key.keysym.sym)
+        switch(pEvent->key.keysym.scancode)
         {
-            case SDLK_ESCAPE:
+            case SDL_SCANCODE_ESCAPE:
                 pGame->isRunning = false;
+                break;
+            case SDL_SCANCODE_W:
+            case SDL_SCANCODE_UP:
+                movePlayerUp(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_S:
+            case SDL_SCANCODE_DOWN:
+                movePlayerDown(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_A:
+            case SDL_SCANCODE_LEFT:
+                movePlayerLeft(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_D:
+            case SDL_SCANCODE_RIGHT:
+                movePlayerRight(pGame->pPlayer);
+                break;
+            default:
+                break;
+        }
+    }
+    else if(pEvent->type == SDL_KEYUP)
+    {
+        switch (pEvent->key.keysym.scancode)
+        {
+            case SDL_SCANCODE_W:
+            case SDL_SCANCODE_S:
+                stopMovementVY(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_A:
+            case SDL_SCANCODE_D:
+                stopMovementVX(pGame->pPlayer);
                 break;
             default:
                 break;
@@ -103,9 +143,10 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
     }
 }
 
-void updateGame(Game *pGame)
+void updateGame(Game *pGame, float deltaTime)
 {
     (void)pGame; //silence the warning
+    updatePlayer(pGame->pPlayer, deltaTime);
 }
 
 void renderGame(Game *pGame)
@@ -119,6 +160,8 @@ void renderGame(Game *pGame)
 
 void closeGame(Game *pGame)
 {
+    if(pGame->pPlayer) 
+        destroyPlayer(pGame->pPlayer);
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)

@@ -5,6 +5,6 @@
 #define WINDOW_HEIGHT 600
 #define PLAYERWIDTH 50
 #define PLAYERHEIGHT 50
-#define PLAYERSPEED 20
+#define PLAYERSPEED 200
 
 #endif 
