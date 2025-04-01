@@ -2,6 +2,9 @@
 *.log
 /bin
 
+/.vscode
+.gitignore
+
 # Object files
 *.o
 *.ko
