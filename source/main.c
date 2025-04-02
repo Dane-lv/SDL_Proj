@@ -170,5 +170,7 @@ void closeGame(Game *pGame)
         SDL_DestroyWindow(pGame->pWindow);
     if(pGame->bgTexture)
         destroyMap(pGame->bgTexture);
+    if(pGame->wallTexture)
+        destroyMap(pGame->wallTexture);
     SDL_Quit();
 }

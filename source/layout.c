@@ -50,9 +50,9 @@ void createMaze(SDL_Renderer *pRenderer, SDL_Texture *wallTexture)
     }
 }
 
-void destroyMap(SDL_Texture *bgTexture)
+void destroyMap(SDL_Texture *texture)
 {
-    SDL_DestroyTexture(bgTexture);
-    bgTexture=NULL;
+    SDL_DestroyTexture(texture);
+    texture=NULL;
 }
 
