@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
+#include "../include/layout.h"
 #define NAWID
 
 struct game {
@@ -10,6 +11,8 @@ struct game {
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
     Player *pPlayer;
+    SDL_Texture *bgTexture;
+    SDL_Texture *wallTexture;
 };
 typedef struct game Game;
 
@@ -39,7 +42,6 @@ bool initiateGame(Game *pGame)
         printf("SDL Initialization Error: %s\n", SDL_GetError());
         return false;
     }
-
     pGame->pWindow = SDL_CreateWindow("Maze Mayhem", SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,WINDOW_WIDTH,WINDOW_HEIGHT,0);
     if (!pGame->pWindow)
     {
@@ -47,7 +49,6 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;
     }
-
     pGame->pRenderer = SDL_CreateRenderer(pGame->pWindow, -1, 0);
     if (!pGame->pRenderer)
     {
@@ -55,14 +56,14 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;    
     }
-
+    pGame->bgTexture=initiateMap(pGame->pRenderer);
+    pGame->wallTexture=initiateMaze(pGame->pRenderer);
     pGame->pPlayer = createPlayer(WINDOW_WIDTH/2,WINDOW_HEIGHT/2,pGame->pRenderer);
     if(!pGame->pPlayer){
         printf("Error: %s\n",SDL_GetError());
         closeGame(pGame);
         return false;
     }
-    
     return true;
 }
 
@@ -153,8 +154,9 @@ void renderGame(Game *pGame)
 {
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
+    drawMap(pGame->pRenderer, pGame->bgTexture);
+    createMaze(pGame->pRenderer, pGame->wallTexture);
     drawPlayer(pGame->pPlayer);
-
     SDL_RenderPresent(pGame->pRenderer);
 }
 
@@ -166,5 +168,7 @@ void closeGame(Game *pGame)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)
         SDL_DestroyWindow(pGame->pWindow);
+    if(pGame->bgTexture)
+        destroyMap(pGame->bgTexture);
     SDL_Quit();
 }
