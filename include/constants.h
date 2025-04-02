@@ -6,5 +6,7 @@
 #define PLAYERWIDTH 50
 #define PLAYERHEIGHT 50
 #define PLAYERSPEED 200
+#define WORLD_WIDTH 1600
+#define WORLD_HEIGHT 1200
 
 #endif 

@@ -13,11 +13,11 @@ struct player
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
 }; 
 
-Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
+Player *createPlayer(SDL_Renderer *pRenderer)
 {
     Player *pPlayer = malloc(sizeof(struct player));
-    pPlayer->x = x;
-    pPlayer->y = y;
+    pPlayer->x = WORLD_WIDTH / 2 - PLAYERWIDTH / 2;
+    pPlayer->y = WORLD_HEIGHT / 2 - PLAYERHEIGHT / 2;
     pPlayer->vy = pPlayer->vx = 0;
     pPlayer->angle = 0;
     SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
@@ -50,8 +50,8 @@ void updatePlayer(Player *pPlayer, float deltaTime)
     pPlayer->y += pPlayer->vy * deltaTime;
     if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
     if(pPlayer->y < 0) pPlayer->y = 0;
-    if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
-    if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
+    if(pPlayer->x > (WORLD_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WORLD_WIDTH - pPlayer->playerRect.w;
+    if(pPlayer->y > (WORLD_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WORLD_HEIGHT - pPlayer->playerRect.h;
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
 } 
@@ -86,8 +86,20 @@ void stopMovementVX(Player *pPlayer)
     pPlayer->vx = 0;   
 }
 
+SDL_Rect getPlayerPosition(Player *pPlayer)
+{
+    return pPlayer->playerRect;
+}
+
+SDL_Texture *getPlayerTexture(Player *pPlayer)
+{
+    return pPlayer->pTexture;
+}
 
 void destroyPlayer(Player *pPlayer)
 {
+    if (pPlayer->pTexture) {
+        SDL_DestroyTexture(pPlayer->pTexture);
+    }
     free(pPlayer);
 }
