@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
+#include "../include/projectile.h"
 #define NAWID
 
 struct game {
@@ -10,6 +11,7 @@ struct game {
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
     Player *pPlayer;
+    Projectile *pProjectile;
 };
 typedef struct game Game;
 
@@ -59,6 +61,13 @@ bool initiateGame(Game *pGame)
     pGame->pPlayer = createPlayer(WINDOW_WIDTH/2,WINDOW_HEIGHT/2,pGame->pRenderer);
     if(!pGame->pPlayer){
         printf("Error: %s\n",SDL_GetError());
+        closeGame(pGame);
+        return false;
+    }
+
+    pGame->pProjectile = createProjectile(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, 10, pGame->pRenderer);
+    if(!pGame->pProjectile){
+        printf("Error: %s\n", SDL_GetError());
         closeGame(pGame);
         return false;
     }
@@ -147,6 +156,7 @@ void updateGame(Game *pGame, float deltaTime)
 {
     (void)pGame; //silence the warning
     updatePlayer(pGame->pPlayer, deltaTime);
+    updateProjectile(pGame->pProjectile, deltaTime);
 }
 
 void renderGame(Game *pGame)
@@ -154,6 +164,7 @@ void renderGame(Game *pGame)
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
     drawPlayer(pGame->pPlayer);
+    drawProjectile(pGame->pRenderer, pGame->pProjectile);
 
     SDL_RenderPresent(pGame->pRenderer);
 }
@@ -162,6 +173,8 @@ void closeGame(Game *pGame)
 {
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
+    if(pGame->pProjectile)
+        destroyProjectile(pGame->pProjectile);
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)
