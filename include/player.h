@@ -16,7 +16,9 @@ void movePlayerUp(Player *pPlayer);
 void movePlayerDown(Player *pPlayer);
 void stopMovementVY(Player *pPlayer);
 void stopMovementVX(Player *pPlayer);
-void getGunEndPoint(Player *pPlayer, float *outX, float *outY);
+SDL_Rect getPlayerRect(Player *pPlayer);
+void setPlayerPosition(Player *pPlayer, float x, float y);
+void revertToPreviousPosition(Player *pPlayer);
 
 
 

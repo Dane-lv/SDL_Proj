@@ -7,6 +7,7 @@
 struct player
 {
     float x, y; //player movement math
+    float prevX, prevY; // Previous position for collision resolution
     float vy, vx;
     float angle;
     SDL_Renderer *pRenderer;
@@ -48,10 +49,16 @@ void drawPlayer(Player *pPlayer)
 
 void updatePlayer(Player *pPlayer, float deltaTime)
 {
+    // spara föredetta position 
+    pPlayer->prevX = pPlayer->x;
+    pPlayer->prevY = pPlayer->y;
+    
+    // Uppdatera tid
     pPlayer->x += pPlayer->vx * deltaTime;
     pPlayer->y += pPlayer->vy * deltaTime;
     
-    if(pPlayer->x < 0) pPlayer->x = 0; //out of bounds
+
+    if(pPlayer->x < 0) pPlayer->x = 0;
     if(pPlayer->y < 0) pPlayer->y = 0;
     if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
     if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
@@ -107,8 +114,28 @@ void stopMovementVX(Player *pPlayer)
     pPlayer->vx = 0;   
 }
 
+SDL_Rect getPlayerRect(Player *pPlayer)
+{
+    return pPlayer->playerRect;
+}
+
+void setPlayerPosition(Player *pPlayer, float x, float y)
+{
+    pPlayer->x = x;
+    pPlayer->y = y;
+    pPlayer->playerRect.x = (int)x;
+    pPlayer->playerRect.y = (int)y;
+}
 
 void destroyPlayer(Player *pPlayer)
 {
     free(pPlayer);
+}
+
+void revertToPreviousPosition(Player *pPlayer)
+{
+    pPlayer->x = pPlayer->prevX;
+    pPlayer->y = pPlayer->prevY;
+    pPlayer->playerRect.x = (int)pPlayer->x;
+    pPlayer->playerRect.y = (int)pPlayer->y;
 }
