@@ -2,11 +2,8 @@
 #define LAYOUT_H
 
 #include <SDL.h>
+#include "../include/maze.h"
 
-SDL_Texture* initiateMap(SDL_Renderer *pRenderer);
-SDL_Texture* initiateMaze(SDL_Renderer *pRenderer);
-void drawMap(SDL_Renderer *pRenderer, SDL_Texture *bgTexture);
-void createMaze(SDL_Renderer *pRenderer, SDL_Texture *wallTexture);
-void destroyTexture(SDL_Texture *texture);
+void mazeLayout1(Maze* pMaze);
 
 #endif

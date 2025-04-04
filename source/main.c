@@ -4,6 +4,7 @@
 #include "../include/constants.h"
 #include "../include/player.h"
 #include "../include/layout.h"
+#include "../include/maze.h"
 #define NAWID
 
 struct game {
@@ -11,6 +12,7 @@ struct game {
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
     Player *pPlayer;
+    Maze *pMaze;
     SDL_Texture *bgTexture;
     SDL_Texture *wallTexture;
 };
@@ -64,6 +66,15 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;
     }
+    pGame->pMaze = createMaze(pGame->pRenderer, pGame->wallTexture);
+    if(!pGame->pMaze){
+        printf("Maze Creation Error: %s\n", SDL_GetError());
+        closeGame(pGame);
+        return false;
+    }
+    
+    mazeLayout1(pGame->pMaze);
+
     return true;
 }
 
@@ -132,10 +143,14 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
         {
             case SDL_SCANCODE_W:
             case SDL_SCANCODE_S:
+            case SDL_SCANCODE_UP:
+            case SDL_SCANCODE_DOWN:
                 stopMovementVY(pGame->pPlayer);
                 break;
             case SDL_SCANCODE_A:
             case SDL_SCANCODE_D:
+            case SDL_SCANCODE_LEFT:
+            case SDL_SCANCODE_RIGHT:
                 stopMovementVX(pGame->pPlayer);
                 break;
             default:
@@ -146,8 +161,12 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 
 void updateGame(Game *pGame, float deltaTime)
 {
-    (void)pGame; //silence the warning
+    // Update player position
     updatePlayer(pGame->pPlayer, deltaTime);
+    
+    if (checkCollision(pGame->pMaze, getPlayerRect(pGame->pPlayer))) {
+        revertToPreviousPosition(pGame->pPlayer);
+    }
 }
 
 void renderGame(Game *pGame)
@@ -155,7 +174,7 @@ void renderGame(Game *pGame)
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
     drawMap(pGame->pRenderer, pGame->bgTexture);
-    createMaze(pGame->pRenderer, pGame->wallTexture);
+    drawMaze(pGame->pMaze);
     drawPlayer(pGame->pPlayer);
     SDL_RenderPresent(pGame->pRenderer);
 }
@@ -164,6 +183,8 @@ void closeGame(Game *pGame)
 {
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
+    if(pGame->pMaze)
+        destroyMaze(pGame->pMaze);
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)
