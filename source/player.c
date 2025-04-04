@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <SDL_image.h>
+#include <math.h>
 #include "../include/player.h"
 #include "../include/constants.h"
 
@@ -8,7 +9,7 @@ struct player
     float x, y; //player movement math
     float prevX, prevY; // Previous position for collision resolution
     float vy, vx;
-    int angle;
+    float angle;
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
@@ -37,12 +38,13 @@ Player *createPlayer(int x, int y, SDL_Renderer *pRenderer)
     pPlayer->playerRect.y = (int)pPlayer->y;
     pPlayer->playerRect.w = PLAYERWIDTH;
     pPlayer->playerRect.h = PLAYERHEIGHT;
+  
     return pPlayer;
 }
 
 void drawPlayer(Player *pPlayer)
 {
-    SDL_RenderCopy(pPlayer->pRenderer,pPlayer->pTexture,NULL,&(pPlayer->playerRect));
+    SDL_RenderCopyEx(pPlayer->pRenderer, pPlayer->pTexture, NULL, &(pPlayer->playerRect), pPlayer->angle + 90.0f, NULL, SDL_FLIP_NONE);
 }
 
 void updatePlayer(Player *pPlayer, float deltaTime)
@@ -55,15 +57,32 @@ void updatePlayer(Player *pPlayer, float deltaTime)
     pPlayer->x += pPlayer->vx * deltaTime;
     pPlayer->y += pPlayer->vy * deltaTime;
     
+
     if(pPlayer->x < 0) pPlayer->x = 0;
     if(pPlayer->y < 0) pPlayer->y = 0;
     if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
     if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
-    
-    // Uppdatera rect
+
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
-} 
+
+    //current mouse position
+    int mouseX, mouseY;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    
+    //center of the player
+    float playerCenterX = pPlayer->playerRect.x + pPlayer->playerRect.w / 2.0f;
+    float playerCenterY = pPlayer->playerRect.y + pPlayer->playerRect.h / 2.0f;
+    
+    // angle between player and mouse cursor
+    float deltaX = mouseX - playerCenterX;
+    float deltaY = mouseY - playerCenterY;
+    //få vinkel (tan) i radianer
+    float radians = atan2f(deltaY, deltaX);
+    //radianer till grader
+    pPlayer->angle = radians * 180.0f / M_PI;
+    
+}
 
 void movePlayerLeft(Player *pPlayer) {
     pPlayer->vx = -PLAYERSPEED;
