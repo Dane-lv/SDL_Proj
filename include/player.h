@@ -16,6 +16,7 @@ void movePlayerUp(Player *pPlayer);
 void movePlayerDown(Player *pPlayer);
 void stopMovementVY(Player *pPlayer);
 void stopMovementVX(Player *pPlayer);
+void getGunEndPoint(Player *pPlayer, float *outX, float *outY);
 
 
 

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
-#define NAWID
+
 
 struct game {
     bool isRunning;
@@ -28,7 +28,6 @@ int main(int argc, char** argv)
     if(!initiateGame(&g)) return 1;
     run(&g);
     closeGame(&g);
-
     return 0;
 }
 
@@ -147,6 +146,8 @@ void updateGame(Game *pGame, float deltaTime)
 {
     (void)pGame; //silence the warning
     updatePlayer(pGame->pPlayer, deltaTime);
+
+
 }
 
 void renderGame(Game *pGame)
