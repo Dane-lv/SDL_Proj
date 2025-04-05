@@ -65,7 +65,7 @@ bool initiateGame(Game *pGame)
         return false;
     }
 
-    pGame->pProjectile = createProjectile(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, 10, pGame->pRenderer);
+    pGame->pProjectile = create_projectile(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, 10, pGame->pRenderer);
     if(!pGame->pProjectile){
         printf("Error: %s\n", SDL_GetError());
         closeGame(pGame);
@@ -174,7 +174,7 @@ void closeGame(Game *pGame)
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
     if(pGame->pProjectile)
-        destroyProjectile(pGame->pProjectile);
+        destroy_projectile(pGame->pProjectile);
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)
