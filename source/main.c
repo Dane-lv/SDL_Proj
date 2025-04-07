@@ -65,7 +65,7 @@ bool initiateGame(Game *pGame)
         return false;
     }
 
-    pGame->pProjectile = create_projectile(WINDOW_WIDTH/2, WINDOW_HEIGHT/2, 10, pGame->pRenderer);
+    pGame->pProjectile = create_projectile(pGame->pRenderer, WINDOW_WIDTH/2, WINDOW_HEIGHT/2, 10);
     if(!pGame->pProjectile){
         printf("Error: %s\n", SDL_GetError());
         closeGame(pGame);

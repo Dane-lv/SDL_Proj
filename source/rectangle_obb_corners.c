@@ -29,12 +29,13 @@ void corners_rotate(const SDL_Rect bounding_box, const float angle_degrees, SDL_
 
     // calculate and store the rotated corners
     for(int i = 0; i < 4; i++){
-        // rotate each corner by applying the rotation matrix
+        // rotate each corner by applying the 2D-rotation matrix
         corners[i].x = cx + (dx[i] * cosf(angle_radians) - dy[i] * sinf(angle_radians));
         corners[i].y = cy + (dx[i] * sinf(angle_radians) + dy[i] * cosf(angle_radians));
     }
 }
 
+// check if the corner is within the bounds of the other rectangle
 bool corners_overlap(const SDL_FPoint corner, const SDL_Rect other_object){
     return ((corner.x >= other_object.x) && (corner.x <= other_object.x + other_object.w)
         && (corner.y >= other_object.y) && (corner.y <= other_object.y + other_object.h));
