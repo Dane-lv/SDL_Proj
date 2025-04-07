@@ -2,8 +2,9 @@
 #define CAMERA_H
 
 #include <SDL.h>
-#include "player.h"
 
+// Forward declaration to avoid circular include
+typedef struct player Player;
 typedef struct camera Camera;
 
 Camera *createCamera(int width, int height);

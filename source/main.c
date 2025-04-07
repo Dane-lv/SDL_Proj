@@ -31,6 +31,7 @@ void handleInput(Game *pGame, SDL_Event *pEvent);
 void updateGame(Game *pGame, float deltaTime);
 void renderGame(Game *pGame);
 void drawCheckerboard(Game *pGame);
+void updatePlayerRotation(Game *pGame);
 
 int main(int argc, char** argv)
 {
@@ -67,9 +68,8 @@ bool initiateGame(Game *pGame)
 
 
     pGame->pPlayer = createPlayer(pGame->pRenderer);
-    pGame->bgTexture=initiateMap(pGame->pRenderer);
+    pGame->bgTexture = NULL;
     pGame->wallTexture=initiateMaze(pGame->pRenderer);
-    pGame->pPlayer = createPlayer(WINDOW_WIDTH/2,WINDOW_HEIGHT/2,pGame->pRenderer);
 
     if(!pGame->pPlayer){
         printf("Error: %s\n",SDL_GetError());
@@ -123,6 +123,7 @@ void run(Game *pGame)
             }
         }
         updateGame(pGame, deltaTime);
+        updatePlayerRotation(pGame);
         renderGame(pGame);
     }
 }
@@ -180,43 +181,64 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 
 void updateGame(Game *pGame, float deltaTime)
 {
-
-    updatePlayer(pGame->pPlayer, deltaTime);
-    updateCamera(pGame->pCamera, pGame->pPlayer);
-
     // Update player position
     updatePlayer(pGame->pPlayer, deltaTime);
     
-    if (checkCollision(pGame->pMaze, getPlayerRect(pGame->pPlayer))) {
+    // Check collision and revert if needed
+    SDL_Rect playerRect = getPlayerRect(pGame->pPlayer);
+    bool collision = checkCollision(pGame->pMaze, playerRect);
+    
+    if (collision) {
+        printf("Collision detected! Player at (%d,%d)\n", playerRect.x, playerRect.y);
         revertToPreviousPosition(pGame->pPlayer);
     }
-
-
+    
+    // Update camera after final player position is determined
+    updateCamera(pGame->pCamera, pGame->pPlayer);
 }
 
+void updatePlayerRotation(Game *pGame)
+{
+    // Get mouse position in screen coordinates
+    int mouseX, mouseY;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    
+    // Get player position in world coordinates
+    SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
+    
+    // Convert player position to screen coordinates using camera
+    SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(pGame->pCamera, playerPos);
+    
+    // Calculate player center in screen coordinates
+    float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
+    float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
+    
+    // Calculate angle between player center and mouse
+    float deltaX = mouseX - playerCenterX;
+    float deltaY = mouseY - playerCenterY;
+    float radians = atan2f(deltaY, deltaX);
+    float angle = radians * 180.0f / M_PI;
+    
+    // Update player angle
+    setPlayerAngle(pGame->pPlayer, angle);
+}
 
 void renderGame(Game *pGame)
 {
     // Clear with a dark background
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
-
     
+    // Draw background (now a solid color instead of texture)
+    drawMap(pGame->pRenderer, pGame->bgTexture, pGame->pCamera);
     
-    // Get player's original rectangle
-    SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
+    // Draw maze with camera adjustment
+    drawMaze(pGame->pMaze, pGame->pCamera);
     
-    // Adjust for camera
-    SDL_Rect adjustedPos = getWorldCoordinatesFromCamera(pGame->pCamera, playerPos);
+    // Draw player
+    drawPlayer(pGame->pPlayer, pGame->pCamera);
     
-    // Draw player with adjusted coordinates
-    SDL_RenderCopy(pGame->pRenderer, getPlayerTexture(pGame->pPlayer), NULL, &adjustedPos);
-    
-
-    drawMap(pGame->pRenderer, pGame->bgTexture);
-    drawMaze(pGame->pMaze);
-    drawPlayer(pGame->pPlayer);
-
+    // Present the rendered frame
     SDL_RenderPresent(pGame->pRenderer);
 }
 

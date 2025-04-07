@@ -3,6 +3,7 @@
 #include <math.h>
 #include "../include/player.h"
 #include "../include/constants.h"
+#include "../include/camera.h"
 
 struct player
 {
@@ -18,8 +19,9 @@ struct player
 Player *createPlayer(SDL_Renderer *pRenderer)
 {
     Player *pPlayer = malloc(sizeof(struct player));
-    pPlayer->x = WORLD_WIDTH / 2 - PLAYERWIDTH / 2;
-    pPlayer->y = WORLD_HEIGHT / 2 - PLAYERHEIGHT / 2;
+    // Spawn player in a safe location (center of the main area)
+    pPlayer->x = 400;
+    pPlayer->y = 300;
     pPlayer->vy = pPlayer->vx = 0;
     pPlayer->angle = 0;
     SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
@@ -42,51 +44,31 @@ Player *createPlayer(SDL_Renderer *pRenderer)
     return pPlayer;
 }
 
-void drawPlayer(Player *pPlayer)
+void drawPlayer(Player *pPlayer, Camera *pCamera)
 {
-    SDL_RenderCopyEx(pPlayer->pRenderer, pPlayer->pTexture, NULL, &(pPlayer->playerRect), pPlayer->angle + 90.0f, NULL, SDL_FLIP_NONE);
+    // Create a copy of player rect for camera adjustments
+    SDL_Rect playerRect = pPlayer->playerRect;
+    
+    // Apply camera transformation
+    SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, playerRect);
+    
+    // Render the player with the adjusted position
+    SDL_RenderCopyEx(pPlayer->pRenderer, pPlayer->pTexture, NULL, &adjustedRect, pPlayer->angle + 90.0f, NULL, SDL_FLIP_NONE);
 }
 
 void updatePlayer(Player *pPlayer, float deltaTime)
 {
-    // spara föredetta position 
+    // Save previous position for collision resolution
     pPlayer->prevX = pPlayer->x;
     pPlayer->prevY = pPlayer->y;
     
-    // Uppdatera tid
+    // Update position based on velocity and time
     pPlayer->x += pPlayer->vx * deltaTime;
     pPlayer->y += pPlayer->vy * deltaTime;
     
-
-    if(pPlayer->x < 0) pPlayer->x = 0;
-    if(pPlayer->y < 0) pPlayer->y = 0;
-
-    if(pPlayer->x > (WORLD_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WORLD_WIDTH - pPlayer->playerRect.w;
-    if(pPlayer->y > (WORLD_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WORLD_HEIGHT - pPlayer->playerRect.h;
-
-    if(pPlayer->x > (WINDOW_WIDTH - pPlayer->playerRect.w)) pPlayer->x = WINDOW_WIDTH - pPlayer->playerRect.w;
-    if(pPlayer->y > (WINDOW_HEIGHT - pPlayer->playerRect.h)) pPlayer->y = WINDOW_HEIGHT - pPlayer->playerRect.h;
-
-
+    // Update the player's rectangle for rendering and collision
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
-
-    //current mouse position
-    int mouseX, mouseY;
-    SDL_GetMouseState(&mouseX, &mouseY);
-    
-    //center of the player
-    float playerCenterX = pPlayer->playerRect.x + pPlayer->playerRect.w / 2.0f;
-    float playerCenterY = pPlayer->playerRect.y + pPlayer->playerRect.h / 2.0f;
-    
-    // angle between player and mouse cursor
-    float deltaX = mouseX - playerCenterX;
-    float deltaY = mouseY - playerCenterY;
-    //få vinkel (tan) i radianer
-    float radians = atan2f(deltaY, deltaX);
-    //radianer till grader
-    pPlayer->angle = radians * 180.0f / M_PI;
-    
 }
 
 void movePlayerLeft(Player *pPlayer) {
@@ -119,19 +101,20 @@ void stopMovementVX(Player *pPlayer)
     pPlayer->vx = 0;   
 }
 
-
 SDL_Rect getPlayerPosition(Player *pPlayer)
-
-SDL_Rect getPlayerRect(Player *pPlayer)
-
 {
     return pPlayer->playerRect;
 }
 
+SDL_Rect getPlayerRect(Player *pPlayer)
+{
+    return pPlayer->playerRect;
+}
 
 SDL_Texture *getPlayerTexture(Player *pPlayer)
 {
     return pPlayer->pTexture;
+}
 
 void setPlayerPosition(Player *pPlayer, float x, float y)
 {
@@ -139,7 +122,11 @@ void setPlayerPosition(Player *pPlayer, float x, float y)
     pPlayer->y = y;
     pPlayer->playerRect.x = (int)x;
     pPlayer->playerRect.y = (int)y;
+}
 
+void setPlayerAngle(Player *pPlayer, float angle)
+{
+    pPlayer->angle = angle;
 }
 
 void destroyPlayer(Player *pPlayer)

@@ -25,24 +25,26 @@ void updateCamera(Camera *pCamera, Player *pPlayer)
     // Get player's position
     SDL_Rect playerPos = getPlayerPosition(pPlayer);
     
-    // Center the camera on the player
-    pCamera->x = playerPos.x + (playerPos.w / 2) - (pCamera->width / 2);
-    pCamera->y = playerPos.y + (playerPos.h / 2) - (pCamera->height / 2);
+    // Calculate effective viewport dimensions based on zoom
+    int effectiveWidth = pCamera->width / CAMERA_ZOOM;
+    int effectiveHeight = pCamera->height / CAMERA_ZOOM;
     
-    // Ensure camera doesn't show beyond the world boundaries
-    if (pCamera->x < 0) pCamera->x = 0;
-    if (pCamera->y < 0) pCamera->y = 0;
-    if (pCamera->x > WORLD_WIDTH - pCamera->width) pCamera->x = WORLD_WIDTH - pCamera->width;
-    if (pCamera->y > WORLD_HEIGHT - pCamera->height) pCamera->y = WORLD_HEIGHT - pCamera->height;
+    // Always center the camera on the player, regardless of world boundaries
+    pCamera->x = playerPos.x + (playerPos.w / 2) - (effectiveWidth / 2);
+    pCamera->y = playerPos.y + (playerPos.h / 2) - (effectiveHeight / 2);
+    
+    // No boundary checks - allow camera to follow player everywhere
 }
 
 SDL_Rect getWorldCoordinatesFromCamera(Camera *pCamera, SDL_Rect entityRect)
 {
     SDL_Rect cameraAdjustedRect = entityRect;
     
-    // Calculate screen coordinates by subtracting camera position
-    cameraAdjustedRect.x = entityRect.x - (int)pCamera->x;
-    cameraAdjustedRect.y = entityRect.y - (int)pCamera->y;
+    // Calculate screen coordinates by subtracting camera position and applying zoom
+    cameraAdjustedRect.x = (int)((entityRect.x - pCamera->x) * CAMERA_ZOOM);
+    cameraAdjustedRect.y = (int)((entityRect.y - pCamera->y) * CAMERA_ZOOM);
+    cameraAdjustedRect.w = (int)(entityRect.w * CAMERA_ZOOM);
+    cameraAdjustedRect.h = (int)(entityRect.h * CAMERA_ZOOM);
     
     return cameraAdjustedRect;
 }

@@ -4,6 +4,7 @@
 #include <SDL_image.h>
 #include "../include/maze.h"
 #include "../include/constants.h"
+#include "../include/camera.h"
 
 #define MAX_WALLS 100
 
@@ -38,11 +39,22 @@ void destroyMaze(Maze* pMaze) {
     }
 }
 
-void drawMaze(Maze* pMaze) {
+void drawMaze(Maze* pMaze, Camera* pCamera) {
     if (!pMaze) return;
     
     for (int i = 0; i < pMaze->wallCount; i++) {
-        SDL_RenderCopy(pMaze->pRenderer, pMaze->wallTexture, NULL, &(pMaze->walls[i].rect));
+        // Create a copy of the wall rect for camera adjustment
+        SDL_Rect wallRect = pMaze->walls[i].rect;
+        
+        // Transform world coordinates to screen coordinates
+        SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, wallRect);
+        
+        // Only draw walls that are visible on screen
+        if (adjustedRect.x < WINDOW_WIDTH && adjustedRect.y < WINDOW_HEIGHT && 
+            adjustedRect.x + adjustedRect.w > 0 && adjustedRect.y + adjustedRect.h > 0) {
+            // Render the wall
+            SDL_RenderCopy(pMaze->pRenderer, pMaze->wallTexture, NULL, &adjustedRect);
+        }
     }
 }
 
@@ -92,10 +104,14 @@ SDL_Texture* initiateMaze(SDL_Renderer *pRenderer)
     return wallTexture;
 }
 
-void drawMap(SDL_Renderer *pRenderer, SDL_Texture *bgTexture)
+void drawMap(SDL_Renderer *pRenderer, SDL_Texture *bgTexture, Camera *pCamera)
 {
+    // Create a background rect that fills the viewport
     SDL_Rect bgRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
-    SDL_RenderCopy(pRenderer, bgTexture, NULL, &bgRect);
+    
+    // Set a solid black background
+    SDL_SetRenderDrawColor(pRenderer, 0, 0, 0, 255); // Pure black
+    SDL_RenderFillRect(pRenderer, &bgRect);
 }
 
 void destroyTexture(SDL_Texture *texture)
