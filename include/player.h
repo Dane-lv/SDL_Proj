@@ -16,8 +16,14 @@ void movePlayerUp(Player *pPlayer);
 void movePlayerDown(Player *pPlayer);
 void stopMovementVY(Player *pPlayer);
 void stopMovementVX(Player *pPlayer);
+
 SDL_Rect getPlayerPosition(Player *pPlayer);
 SDL_Texture *getPlayerTexture(Player *pPlayer);
+
+SDL_Rect getPlayerRect(Player *pPlayer);
+void setPlayerPosition(Player *pPlayer, float x, float y);
+void revertToPreviousPosition(Player *pPlayer);
+
 
 
 
