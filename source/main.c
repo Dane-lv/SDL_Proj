@@ -5,8 +5,6 @@
 #include "../include/player.h"
 #include "../include/camera.h"
 
-// Size of each checkerboard square FOR VISUALISATION
-#define CHECKER_SIZE 64
 
 struct game {
     bool isRunning;
@@ -161,41 +159,6 @@ void updateGame(Game *pGame, float deltaTime)
     updateCamera(pGame->pCamera, pGame->pPlayer);
 }
 
-void drawCheckerboard(Game *pGame) //FOR VISUALISATION
-{
-    // Get camera position
-    int camX = getCameraX(pGame->pCamera);
-    int camY = getCameraY(pGame->pCamera);
-    
-    // Calculate the starting grid position (which checker we're seeing at top-left)
-    int startX = camX / CHECKER_SIZE;
-    int startY = camY / CHECKER_SIZE;
-    
-    // Calculate offset to ensure smooth scrolling
-    int offsetX = -(camX % CHECKER_SIZE);
-    int offsetY = -(camY % CHECKER_SIZE);
-    
-    // Draw the checkerboard
-    for (int y = 0; y <= WINDOW_HEIGHT / CHECKER_SIZE + 1; y++) {
-        for (int x = 0; x <= WINDOW_WIDTH / CHECKER_SIZE + 1; x++) {
-            SDL_Rect rect = {
-                offsetX + x * CHECKER_SIZE,
-                offsetY + y * CHECKER_SIZE,
-                CHECKER_SIZE,
-                CHECKER_SIZE
-            };
-            
-            // Determine if this square should be white or black
-            if ((startX + x + startY + y) % 2 == 0) {
-                SDL_SetRenderDrawColor(pGame->pRenderer, 200, 200, 200, 255); // Light gray
-            } else {
-                SDL_SetRenderDrawColor(pGame->pRenderer, 50, 50, 50, 255); // Dark gray
-            }
-            
-            SDL_RenderFillRect(pGame->pRenderer, &rect);
-        }
-    }
-}
 
 void renderGame(Game *pGame)
 {
@@ -203,8 +166,6 @@ void renderGame(Game *pGame)
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
     
-    // Draw the checkerboard pattern FOR VISUALISATION
-    drawCheckerboard(pGame);
     
     // Get player's original rectangle
     SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
