@@ -3,10 +3,10 @@
 #include <stdbool.h>
 #include "../include/constants.h"
 #include "../include/player.h"
-
+#include "../include/camera.h"
 #include "../include/layout.h"
 #include "../include/maze.h"
-#define NAWID 
+
 
 
 struct game {
@@ -14,9 +14,13 @@ struct game {
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
     Player *pPlayer;
+
+    Camera *pCamera;
+
     Maze *pMaze;
     SDL_Texture *bgTexture;
     SDL_Texture *wallTexture;
+
 };
 typedef struct game Game;
 
@@ -26,6 +30,7 @@ void run(Game *pGame);
 void handleInput(Game *pGame, SDL_Event *pEvent);
 void updateGame(Game *pGame, float deltaTime);
 void renderGame(Game *pGame);
+void drawCheckerboard(Game *pGame);
 
 int main(int argc, char** argv)
 {
@@ -59,9 +64,13 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;    
     }
+
+
+    pGame->pPlayer = createPlayer(pGame->pRenderer);
     pGame->bgTexture=initiateMap(pGame->pRenderer);
     pGame->wallTexture=initiateMaze(pGame->pRenderer);
     pGame->pPlayer = createPlayer(WINDOW_WIDTH/2,WINDOW_HEIGHT/2,pGame->pRenderer);
+
     if(!pGame->pPlayer){
         printf("Error: %s\n",SDL_GetError());
         closeGame(pGame);
@@ -74,7 +83,16 @@ bool initiateGame(Game *pGame)
         return false;
     }
     
+
+    pGame->pCamera = createCamera(WINDOW_WIDTH, WINDOW_HEIGHT);
+    if(!pGame->pCamera){
+        printf("Error: Failed to create camera\n");
+        closeGame(pGame);
+        return false;
+    }
+   
     mazeLayout1(pGame->pMaze);
+
 
     return true;
 }
@@ -162,6 +180,10 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 
 void updateGame(Game *pGame, float deltaTime)
 {
+
+    updatePlayer(pGame->pPlayer, deltaTime);
+    updateCamera(pGame->pCamera, pGame->pPlayer);
+
     // Update player position
     updatePlayer(pGame->pPlayer, deltaTime);
     
@@ -169,15 +191,32 @@ void updateGame(Game *pGame, float deltaTime)
         revertToPreviousPosition(pGame->pPlayer);
     }
 
+
 }
+
 
 void renderGame(Game *pGame)
 {
+    // Clear with a dark background
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
+
+    
+    
+    // Get player's original rectangle
+    SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
+    
+    // Adjust for camera
+    SDL_Rect adjustedPos = getWorldCoordinatesFromCamera(pGame->pCamera, playerPos);
+    
+    // Draw player with adjusted coordinates
+    SDL_RenderCopy(pGame->pRenderer, getPlayerTexture(pGame->pPlayer), NULL, &adjustedPos);
+    
+
     drawMap(pGame->pRenderer, pGame->bgTexture);
     drawMaze(pGame->pMaze);
     drawPlayer(pGame->pPlayer);
+
     SDL_RenderPresent(pGame->pRenderer);
 }
 
@@ -185,8 +224,13 @@ void closeGame(Game *pGame)
 {
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
+
+    if(pGame->pCamera)
+        destroyCamera(pGame->pCamera);
+
     if(pGame->pMaze)
         destroyMaze(pGame->pMaze);
+
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)

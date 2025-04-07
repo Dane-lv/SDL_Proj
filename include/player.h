@@ -6,7 +6,7 @@
 
 typedef struct player Player;
 
-Player *createPlayer(int x, int y, SDL_Renderer *pRenderer);
+Player *createPlayer(SDL_Renderer *pRenderer);
 void drawPlayer(Player *pPlayer);
 void updatePlayer(Player *pPlayer, float deltaTime);
 void destroyPlayer(Player *pPlayer);
@@ -16,9 +16,14 @@ void movePlayerUp(Player *pPlayer);
 void movePlayerDown(Player *pPlayer);
 void stopMovementVY(Player *pPlayer);
 void stopMovementVX(Player *pPlayer);
+
+SDL_Rect getPlayerPosition(Player *pPlayer);
+SDL_Texture *getPlayerTexture(Player *pPlayer);
+
 SDL_Rect getPlayerRect(Player *pPlayer);
 void setPlayerPosition(Player *pPlayer, float x, float y);
 void revertToPreviousPosition(Player *pPlayer);
+
 
 
 
