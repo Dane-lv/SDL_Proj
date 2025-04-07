@@ -13,6 +13,7 @@ Projectile* create_projectile(SDL_Renderer* pRenderer, const float x_init, const
 void draw_projectile(SDL_Renderer* pRenderer, Projectile* pProjectile);
 void update_projectile(Projectile* pProjectile, const float delta_time);
 void resolve_projectile_collision(Projectile* pProjectile, const SDL_Rect other_object);
+void normalize_angle(Projectile* pProjectile);
 void destroy_projectile(Projectile* pProjectile);
 
 #endif

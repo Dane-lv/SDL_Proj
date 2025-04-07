@@ -29,6 +29,7 @@ Projectile* create_projectile(SDL_Renderer* pRenderer, const float x_init, const
     pProjectile->pos_x = x_init;
     pProjectile->pos_y = y_init;
     pProjectile->angle_degrees = angle_degrees_init;
+    normalize_angle(pProjectile);
 
     pProjectile->bounding_box.w = PROJECTILE_WIDTH;
     pProjectile->bounding_box.h = PROJECTILE_HEIGHT;
@@ -140,6 +141,15 @@ void resolve_projectile_collision(Projectile* pProjectile, const SDL_Rect other_
         pProjectile->angle_degrees = 180 - pProjectile->angle_degrees;
     else if(y_min_distance < x_min_distance)
         pProjectile->angle_degrees = -pProjectile->angle_degrees;
+
+    normalize_angle(pProjectile);
+}
+
+void normalize_angle(Projectile* pProjectile){
+    while(pProjectile->angle_degrees < 0.0f)
+        pProjectile->angle_degrees += 360.0f;
+    while(pProjectile->angle_degrees >= 360.0f)
+        pProjectile->angle_degrees -= 360.0f;
 }
 
 void destroy_projectile(Projectile* pProjectile){
