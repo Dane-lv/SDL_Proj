@@ -129,6 +129,7 @@ void setPlayerAngle(Player *pPlayer, float angle)
     pPlayer->angle = angle;
 }
 
+
 void destroyPlayer(Player *pPlayer)
 {
     if (pPlayer->pTexture) {
