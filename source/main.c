@@ -20,8 +20,8 @@ struct game {
     Camera *pCamera;
 
     Maze *pMaze;
-    SDL_Texture *bgTexture;
-    SDL_Texture *wallTexture;
+    SDL_Surface* tileMapSurface;
+    SDL_Texture tileMapTexture;
 
 };
 typedef struct game Game;
