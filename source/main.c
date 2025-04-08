@@ -7,6 +7,8 @@
 #include "../include/layout.h"
 #include "../include/maze.h"
 
+#define NAWID
+
 
 
 struct game {
@@ -189,7 +191,6 @@ void updateGame(Game *pGame, float deltaTime)
     bool collision = checkCollision(pGame->pMaze, playerRect);
     
     if (collision) {
-        printf("Collision detected! Player at (%d,%d)\n", playerRect.x, playerRect.y);
         revertToPreviousPosition(pGame->pPlayer);
     }
     
