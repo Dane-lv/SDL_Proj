@@ -4,7 +4,6 @@
 #include "../include/constants.h"
 #include "../include/player.h"
 #include "../include/camera.h"
-#include "../include/layout.h"
 #include "../include/maze.h"
 
 #define NAWID
@@ -20,8 +19,9 @@ struct game {
     Camera *pCamera;
 
     Maze *pMaze;
-    SDL_Texture *bgTexture;
-    SDL_Texture *wallTexture;
+    SDL_Texture* tileMapTexture;
+    SDL_Surface* tileMapSurface;
+    int tileMap[TILE_WIDTH][TILE_HEIGHT];
 
 };
 typedef struct game Game;
@@ -68,32 +68,28 @@ bool initiateGame(Game *pGame)
         return false;    
     }
 
-
     pGame->pPlayer = createPlayer(pGame->pRenderer);
-    pGame->bgTexture = NULL;
-    pGame->wallTexture=initiateMaze(pGame->pRenderer);
 
     if(!pGame->pPlayer){
         printf("Error: %s\n",SDL_GetError());
         closeGame(pGame);
         return false;
     }
-    pGame->pMaze = createMaze(pGame->pRenderer, pGame->wallTexture);
+    pGame->pMaze = createMaze(pGame->pRenderer, pGame->tileMapTexture, pGame->tileMapSurface);
     if(!pGame->pMaze){
         printf("Maze Creation Error: %s\n", SDL_GetError());
         closeGame(pGame);
         return false;
     }
-    
-
+    initiateMap(pGame->pMaze);
+    generateMazeLayout(pGame->pMaze);
     pGame->pCamera = createCamera(WINDOW_WIDTH, WINDOW_HEIGHT);
     if(!pGame->pCamera){
         printf("Error: Failed to create camera\n");
         closeGame(pGame);
         return false;
     }
-   
-    mazeLayout1(pGame->pMaze);
+
 
 
     return true;
@@ -189,11 +185,9 @@ void updateGame(Game *pGame, float deltaTime)
     // Check collision and revert if needed
     SDL_Rect playerRect = getPlayerRect(pGame->pPlayer);
     bool collision = checkCollision(pGame->pMaze, playerRect);
-    
     if (collision) {
         revertToPreviousPosition(pGame->pPlayer);
     }
-    
     // Update camera after final player position is determined
     updateCamera(pGame->pCamera, pGame->pPlayer);
 }
@@ -218,7 +212,7 @@ void updatePlayerRotation(Game *pGame)
     float deltaX = mouseX - playerCenterX;
     float deltaY = mouseY - playerCenterY;
     float radians = atan2f(deltaY, deltaX);
-    float angle = radians * 180.0f / M_PI;
+    float angle = radians * 180.0f / 3.14;
     
     // Update player angle
     setPlayerAngle(pGame->pPlayer, angle);
@@ -231,10 +225,7 @@ void renderGame(Game *pGame)
     SDL_RenderClear(pGame->pRenderer);
     
     // Draw background (now a solid color instead of texture)
-    drawMap(pGame->pRenderer, pGame->bgTexture, pGame->pCamera);
-    
-    // Draw maze with camera adjustment
-    drawMaze(pGame->pMaze, pGame->pCamera);
+    drawMap(pGame->pMaze, pGame->pCamera);
     
     // Draw player
     drawPlayer(pGame->pPlayer, pGame->pCamera);
@@ -247,20 +238,13 @@ void closeGame(Game *pGame)
 {
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
-
     if(pGame->pCamera)
         destroyCamera(pGame->pCamera);
-
     if(pGame->pMaze)
         destroyMaze(pGame->pMaze);
-
     if(pGame->pRenderer)
         SDL_DestroyRenderer(pGame->pRenderer);
     if(pGame->pWindow)
         SDL_DestroyWindow(pGame->pWindow);
-    if(pGame->bgTexture)
-        destroyTexture(pGame->bgTexture);
-    if(pGame->wallTexture)
-        destroyTexture(pGame->wallTexture);
     SDL_Quit();
 }
