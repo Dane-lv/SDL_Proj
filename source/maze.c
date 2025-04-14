@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <SDL.h>
 #include <SDL_image.h>
 #include "../include/maze.h"
@@ -8,18 +9,16 @@
 
 #define MAX_WALLS 100
 
-struct wall {
-    SDL_Rect rect;
-};
-
 struct maze {
     SDL_Renderer* pRenderer;
-    SDL_Texture* wallTexture;
-    Wall walls[MAX_WALLS];
-    int wallCount;
+    SDL_Texture* tileMapTexture;
+    SDL_Surface* tileMapSurface;
+    int tiles[TILE_WIDTH][TILE_HEIGHT];
+    SDL_Rect tileRect;
 };
 
-Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* wallTexture) {
+Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* tileMapTexture, SDL_Surface* tileMapSurface) 
+{
     Maze* pMaze = malloc(sizeof(struct maze));
     if (!pMaze) {
         printf("Error: Failed to allocate memory for maze\n");
@@ -27,95 +26,143 @@ Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* wallTexture) {
     }
     
     pMaze->pRenderer = pRenderer;
-    pMaze->wallTexture = wallTexture;
-    pMaze->wallCount = 0;
+    pMaze->tileMapSurface = tileMapSurface;
+    pMaze->tileMapTexture = tileMapTexture;
     
     return pMaze;
 }
 
-void destroyMaze(Maze* pMaze) {
+void generateMazeLayout(Maze* pMaze)
+{
+    // 0 = golv, 1 = vägg
+    for (int x = 0; x < TILE_WIDTH; x++)
+    {
+        for (int y = 0; y < TILE_HEIGHT; y++)
+        {
+            // Gör kanterna till vägg
+            if (x == 0 || x == TILE_WIDTH-1 || y == 0 || y == TILE_HEIGHT-1) {
+                pMaze->tiles[x][y] = 2; // "2" kanske betyder vägg
+            } else {
+                pMaze->tiles[x][y] = 1; // "1" kanske betyder golv
+            }
+        }
+    }
+}
+
+void destroyMaze(Maze* pMaze) 
+{
     if (pMaze) {
         free(pMaze);
     }
 }
 
-void drawMaze(Maze* pMaze, Camera* pCamera) {
-    if (!pMaze) return;
-    
-    for (int i = 0; i < pMaze->wallCount; i++) {
-        // Create a copy of the wall rect for camera adjustment
-        SDL_Rect wallRect = pMaze->walls[i].rect;
-        
-        // Transform world coordinates to screen coordinates
-        SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, wallRect);
-        
-        // Only draw walls that are visible on screen
-        if (adjustedRect.x < WINDOW_WIDTH && adjustedRect.y < WINDOW_HEIGHT && 
-            adjustedRect.x + adjustedRect.w > 0 && adjustedRect.y + adjustedRect.h > 0) {
-            // Render the wall
-            SDL_RenderCopy(pMaze->pRenderer, pMaze->wallTexture, NULL, &adjustedRect);
-        }
-    }
-}
+bool checkCollision(Maze* pMaze, SDL_Rect playerRect)
+{
+    // Räkna ut vilka tile-koordinater spelarens rekt täcker
+    int leftTile   = playerRect.x / 32;
+    int rightTile  = (playerRect.x + playerRect.w - 1) / 32;
+    int topTile    = playerRect.y / 32;
+    int bottomTile = (playerRect.y + playerRect.h - 1) / 32;
 
-bool checkCollision(Maze* pMaze, SDL_Rect playerRect) {
-    if (!pMaze) return false;
-    
-    for (int i = 0; i < pMaze->wallCount; i++) {
-        if (SDL_HasIntersection(&playerRect, &(pMaze->walls[i].rect))) {
-            return true;
+    // Loopa över de tiles som spelaren täcker:
+    for (int tx = leftTile; tx <= rightTile; tx++)
+    {
+        for (int ty = topTile; ty <= bottomTile; ty++)
+        {
+            // Se om denna tile existerar inom arrayens gränser
+            if (tx >= 0 && tx < TILE_WIDTH && ty >= 0 && ty < TILE_HEIGHT)
+            {
+                // Kolla om det är en vägg
+                if (pMaze->tiles[tx][ty] == 2) {
+                    return true; 
+                }
+            }
         }
     }
-    
     return false;
 }
 
-void addWall(Maze* pMaze, int x, int y, int width, int height) {
-    if (!pMaze || pMaze->wallCount >= MAX_WALLS) return;
-    
-    Wall newWall;
-    newWall.rect.x = x;
-    newWall.rect.y = y;
-    newWall.rect.w = width;
-    newWall.rect.h = height;
-    
-    pMaze->walls[pMaze->wallCount] = newWall;
-    pMaze->wallCount++;
-}
 
-void clearWalls(Maze* pMaze) {
-    if (!pMaze) return;
-    pMaze->wallCount = 0;
-}
-
-SDL_Texture* initiateMap(SDL_Renderer *pRenderer)
+void initiateMap(Maze* pMaze)
 {
-    SDL_Surface *pSurface = IMG_Load("resources/Bakgrund.jpg");
-    SDL_Texture *bgTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
-    SDL_FreeSurface(pSurface);
-    return bgTexture;
+    pMaze->tileMapSurface = SDL_LoadBMP("resources/Tiles.bmp");
+    pMaze->tileMapTexture = SDL_CreateTextureFromSurface(pMaze->pRenderer, pMaze->tileMapSurface);
+    SDL_FreeSurface(pMaze->tileMapSurface);
 }
 
-SDL_Texture* initiateMaze(SDL_Renderer *pRenderer)
+void addWall(Maze* pMaze, int x1, int y1, int x2, int y2)
 {
-    SDL_Surface *pSurface = IMG_Load("resources/WallTexture.png");
-    SDL_Texture *wallTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
-    SDL_FreeSurface(pSurface);
-    return wallTexture;
+    // Horisontell linje: y1 == y2
+    if (y1 == y2) {
+        // Se till att x1 <= x2
+        if (x1 > x2) {
+            int tmp = x1; 
+            x1 = x2; 
+            x2 = tmp;
+        }
+        for (int x = x1; x <= x2; x++) {
+            pMaze->tiles[x][y1] = 2; // 2 = vägg
+        }
+    }
+    else if (x1 == x2) {
+        // Se till att y1 <= y2
+        if (y1 > y2) {
+            int tmp = y1; 
+            y1 = y2; 
+            y2 = tmp;
+        }
+        for (int y = y1; y <= y2; y++) {
+            pMaze->tiles[x1][y] = 2; // 2 = vägg
+        }
+    }
 }
 
-void drawMap(SDL_Renderer *pRenderer, SDL_Texture *bgTexture, Camera *pCamera)
+void drawMap(Maze* pMaze, Camera* pCamera)
 {
-    // Create a background rect that fills the viewport
-    SDL_Rect bgRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
-    
-    // Set a solid black background
-    SDL_SetRenderDrawColor(pRenderer, 0, 0, 0, 255); // Pure black
-    SDL_RenderFillRect(pRenderer, &bgRect);
+    for (int x = 0; x < TILE_WIDTH; x++)
+    {
+        for (int y = 0; y < TILE_HEIGHT; y++)
+        {
+            int worldX = x * 32;
+            int worldY = y * 32;
+            pMaze->tileRect.x = worldX;
+            pMaze->tileRect.y = worldY;
+            pMaze->tileRect.w = 30;
+            pMaze->tileRect.h = 30;
+            addWall(pMaze,  5,  5, 10,  5); // Horisontell
+            addWall(pMaze, 10,  0, 10, 10); // Vertikal
+            addWall(pMaze,  8, 11, 12, 11); // Horisontell
+            addWall(pMaze,  5,  8,  5, 15); // Vertikal
+            addWall(pMaze,  0, 16,  8, 16); // ...
+            addWall(pMaze, 12, 16, 15, 16);
+            addWall(pMaze, 16,  8, 16, 20);
+            addWall(pMaze, 16,  3, 16,  5);
+            addWall(pMaze, 13,  3, 22,  3);
+            addWall(pMaze, 20,  4, 20, 10);
+            addWall(pMaze, 20, 11, 23, 11);
+            addWall(pMaze, 24, 11, 24, 14);
+            addWall(pMaze, 24, 18, 24, 24);
+            addWall(pMaze, 20, 19, 24, 19);
+            addWall(pMaze,  5, 20, 11, 20);
+            addWall(pMaze, 12, 17, 12, 21);
+            addWall(pMaze, 25,  5, 25,  8);
+            addWall(pMaze, 25,  8, 29,  8);
+            // Konvertera från världskoordinater till skärmkoordinater via kameran
+            SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, pMaze->tileRect);
+            if (pMaze->tiles[x][y] == 2) {
+                // Vägg
+                SDL_SetRenderDrawColor(pMaze->pRenderer, 255, 255, 255, 255);
+            }
+            else {
+                // Golv
+                SDL_SetRenderDrawColor(pMaze->pRenderer, 50, 50, 50, 255);
+            }
+
+            // Rendera “fylld rektangel” (eller SDL_RenderCopy om du har en textur)
+            SDL_RenderFillRect(pMaze->pRenderer, &adjustedRect);
+        }
+    }
 }
 
-void destroyTexture(SDL_Texture *texture)
-{
-    SDL_DestroyTexture(texture);
-    texture = NULL;
-}
+
+
