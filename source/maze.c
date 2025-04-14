@@ -10,6 +10,7 @@
 
 struct wall {
     SDL_Rect rect;
+    Object_ID objectID;
 };
 
 struct maze {
@@ -78,6 +79,7 @@ void addWall(Maze* pMaze, int x, int y, int width, int height) {
     newWall.rect.y = y;
     newWall.rect.w = width;
     newWall.rect.h = height;
+    newWall.objectID = OBJECT_ID_WALL;
     
     pMaze->walls[pMaze->wallCount] = newWall;
     pMaze->wallCount++;
@@ -118,4 +120,8 @@ void destroyTexture(SDL_Texture *texture)
 {
     SDL_DestroyTexture(texture);
     texture = NULL;
+}
+
+Object_ID getWallObjectID(Wall* pWall) {
+    return pWall->objectID;
 }

@@ -10,4 +10,10 @@
 #define WORLD_HEIGHT 1200
 #define CAMERA_ZOOM 1.5 
 
+typedef enum {
+    OBJECT_ID_PLAYER,
+    OBJECT_ID_WALL,
+    OBJECT_ID_PROJECTILE
+} Object_ID;
+
 #endif 

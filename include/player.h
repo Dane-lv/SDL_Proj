@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include "camera.h"
+#include "constants.h"
 
 typedef struct player Player;
 
@@ -19,6 +20,7 @@ void stopMovementVX(Player *pPlayer);
 
 SDL_Rect getPlayerPosition(Player *pPlayer);
 SDL_Texture *getPlayerTexture(Player *pPlayer);
+Object_ID getPlayerObjectID(Player *pPlayer);
 
 SDL_Rect getPlayerRect(Player *pPlayer);
 void setPlayerPosition(Player *pPlayer, float x, float y);

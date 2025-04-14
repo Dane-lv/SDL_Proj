@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include <stdbool.h>
+#include "constants.h"
 
 // Forward declarations
 typedef struct camera Camera;
@@ -15,6 +16,7 @@ void drawMaze(Maze* pMaze, Camera* pCamera);
 bool checkCollision(Maze* pMaze, SDL_Rect playerRect);
 void addWall(Maze* pMaze, int x, int y, int width, int height);
 void clearWalls(Maze* pMaze);
+Object_ID getWallObjectID(Wall* pWall);
 
 SDL_Texture* initiateMap(SDL_Renderer* pRenderer);
 SDL_Texture* initiateMaze(SDL_Renderer* pRenderer);

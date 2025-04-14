@@ -14,6 +14,7 @@ struct player
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
+    Object_ID objectID;
 }; 
 
 Player *createPlayer(SDL_Renderer *pRenderer)
@@ -24,6 +25,7 @@ Player *createPlayer(SDL_Renderer *pRenderer)
     pPlayer->y = 300;
     pPlayer->vy = pPlayer->vx = 0;
     pPlayer->angle = 0;
+    pPlayer->objectID = OBJECT_ID_PLAYER;
     SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
     if(!pSurface){
         printf("Error: %s\n",SDL_GetError());
@@ -143,4 +145,9 @@ void revertToPreviousPosition(Player *pPlayer)
     pPlayer->y = pPlayer->prevY;
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
+}
+
+Object_ID getPlayerObjectID(Player *pPlayer)
+{
+    return pPlayer->objectID;
 }
