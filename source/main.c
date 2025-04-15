@@ -5,24 +5,21 @@
 #include "../include/player.h"
 #include "../include/camera.h"
 #include "../include/maze.h"
+#include "../include/projectile.h"
 
 #define NAWID
-
-
 
 struct game {
     bool isRunning;
     SDL_Window *pWindow;
     SDL_Renderer *pRenderer;
     Player *pPlayer;
-
     Camera *pCamera;
-
     Maze *pMaze;
     SDL_Texture* tileMapTexture;
     SDL_Surface* tileMapSurface;
     int tileMap[TILE_WIDTH][TILE_HEIGHT];
-
+    Projectile *pProjectile[MAX_PROJECTILES];
 };
 typedef struct game Game;
 
@@ -90,7 +87,15 @@ bool initiateGame(Game *pGame)
         return false;
     }
 
-
+    // Initialize projectiles
+    for(int i = 0; i < MAX_PROJECTILES; i++){
+        pGame->pProjectile[i] = createProjectile(pGame->pRenderer);
+        if(!pGame->pProjectile[i]){
+            printf("Error: Failed to create projectile %d\n", i);
+            closeGame(pGame);
+            return false;
+        }
+    }
 
     return true;
 }
@@ -151,6 +156,9 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
             case SDL_SCANCODE_RIGHT:
                 movePlayerRight(pGame->pPlayer);
                 break;
+            case SDL_SCANCODE_SPACE:
+                spawnProjectile(pGame->pProjectile, pGame->pPlayer);
+                break;
             default:
                 break;
         }
@@ -179,16 +187,14 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 
 void updateGame(Game *pGame, float deltaTime)
 {
-    // Update player position
     updatePlayer(pGame->pPlayer, deltaTime);
     
-    // Check collision and revert if needed
     SDL_Rect playerRect = getPlayerRect(pGame->pPlayer);
     bool collision = checkCollision(pGame->pMaze, playerRect);
     if (collision) {
         revertToPreviousPosition(pGame->pPlayer);
     }
-    // Update camera after final player position is determined
+    updateProjectile(pGame->pProjectile, deltaTime);
     updateCamera(pGame->pCamera, pGame->pPlayer);
 }
 
@@ -197,24 +203,15 @@ void updatePlayerRotation(Game *pGame)
     // Get mouse position in screen coordinates
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
-    
-    // Get player position in world coordinates
     SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
-    
-    // Convert player position to screen coordinates using camera
     SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(pGame->pCamera, playerPos);
-    
-    // Calculate player center in screen coordinates
     float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
     float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
     
-    // Calculate angle between player center and mouse
     float deltaX = mouseX - playerCenterX;
     float deltaY = mouseY - playerCenterY;
     float radians = atan2f(deltaY, deltaX);
     float angle = radians * 180.0f / 3.14;
-    
-    // Update player angle
     setPlayerAngle(pGame->pPlayer, angle);
 }
 
@@ -223,19 +220,17 @@ void renderGame(Game *pGame)
     // Clear with a dark background
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
-    
-    // Draw background (now a solid color instead of texture)
+
     drawMap(pGame->pMaze, pGame->pCamera);
-    
-    // Draw player
     drawPlayer(pGame->pPlayer, pGame->pCamera);
+    drawProjectile(pGame->pProjectile, pGame->pCamera);
     
-    // Present the rendered frame
     SDL_RenderPresent(pGame->pRenderer);
 }
 
 void closeGame(Game *pGame)
 {
+    destroyProjectile(pGame->pProjectile);
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
     if(pGame->pCamera)

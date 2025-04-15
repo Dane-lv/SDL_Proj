@@ -19,7 +19,6 @@ struct player
 Player *createPlayer(SDL_Renderer *pRenderer)
 {
     Player *pPlayer = malloc(sizeof(struct player));
-    // Spawn player in a safe location (center of the main area)
     pPlayer->x = 400;
     pPlayer->y = 300;
     pPlayer->vy = pPlayer->vx = 0;
@@ -46,10 +45,7 @@ Player *createPlayer(SDL_Renderer *pRenderer)
 
 void drawPlayer(Player *pPlayer, Camera *pCamera)
 {
-    // Create a copy of player rect for camera adjustments
     SDL_Rect playerRect = pPlayer->playerRect;
-    
-    // Apply camera transformation
     SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, playerRect);
     
     // Render the player with the adjusted position
@@ -58,15 +54,12 @@ void drawPlayer(Player *pPlayer, Camera *pCamera)
 
 void updatePlayer(Player *pPlayer, float deltaTime)
 {
-    // Save previous position for collision resolution
     pPlayer->prevX = pPlayer->x;
     pPlayer->prevY = pPlayer->y;
     
-    // Update position based on velocity and time
     pPlayer->x += pPlayer->vx * deltaTime;
     pPlayer->y += pPlayer->vy * deltaTime;
     
-    // Update the player's rectangle for rendering and collision
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
 }
@@ -129,6 +122,10 @@ void setPlayerAngle(Player *pPlayer, float angle)
     pPlayer->angle = angle;
 }
 
+float getPlayerAngle(Player *pPlayer)
+{
+    return pPlayer->angle;
+}
 
 void destroyPlayer(Player *pPlayer)
 {
