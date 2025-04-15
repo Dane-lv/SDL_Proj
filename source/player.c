@@ -14,32 +14,41 @@ struct player
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
+    Object_ID objectID;
 }; 
 
 Player *createPlayer(SDL_Renderer *pRenderer)
 {
     Player *pPlayer = malloc(sizeof(struct player));
-    pPlayer->x = 400;
-    pPlayer->y = 300;
-    pPlayer->vy = pPlayer->vx = 0;
-    pPlayer->angle = 0;
     SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
-    if(!pSurface){
-        printf("Error: %s\n",SDL_GetError());
+    if(!pSurface) {
+        printf("Error: %s\n", SDL_GetError());
         return NULL;
     }
+    
     pPlayer->pRenderer = pRenderer;
     pPlayer->pTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
     SDL_FreeSurface(pSurface);
-    if(!pPlayer->pTexture){
-        printf("Error: %s\n",SDL_GetError());
+    if(!pPlayer->pTexture) {
+        printf("Error: %s\n", SDL_GetError());
         return NULL;
     }
+    
+    pPlayer->x = WORLD_WIDTH / 2;
+    pPlayer->y = WORLD_HEIGHT / 2;
+    pPlayer->prevX = pPlayer->x;
+    pPlayer->prevY = pPlayer->y;
+    pPlayer->vx = 0;
+    pPlayer->vy = 0;
+    pPlayer->angle = 0;
+    pPlayer->objectID = OBJECT_ID_PLAYER;
+    
+    // Set explicit dimensions instead of querying texture
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
     pPlayer->playerRect.w = PLAYERWIDTH;
     pPlayer->playerRect.h = PLAYERHEIGHT;
-  
+    
     return pPlayer;
 }
 
@@ -57,31 +66,39 @@ void updatePlayer(Player *pPlayer, float deltaTime)
     pPlayer->prevX = pPlayer->x;
     pPlayer->prevY = pPlayer->y;
     
-    pPlayer->x += pPlayer->vx * deltaTime;
-    pPlayer->y += pPlayer->vy * deltaTime;
+    // Normalize diagonal movement
+    if (pPlayer->vx != 0 && pPlayer->vy != 0) {
+        // Moving diagonally - normalize the speed by multiplying by 0.7071 (approximately 1/sqrt(2))
+        float normalizedVx = pPlayer->vx * 0.7071f;
+        float normalizedVy = pPlayer->vy * 0.7071f;
+        
+        pPlayer->x += normalizedVx * deltaTime;
+        pPlayer->y += normalizedVy * deltaTime;
+    } else {
+        // Moving in a cardinal direction - use full speed
+        pPlayer->x += pPlayer->vx * deltaTime;
+        pPlayer->y += pPlayer->vy * deltaTime;
+    }
     
+    // Update the player rectangle position
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
 }
 
 void movePlayerLeft(Player *pPlayer) {
     pPlayer->vx = -PLAYERSPEED;
-    
 }
 
 void movePlayerRight(Player *pPlayer) {
-    pPlayer->vx = +PLAYERSPEED;
-
+    pPlayer->vx = PLAYERSPEED;
 }
 
 void movePlayerUp(Player *pPlayer) {
     pPlayer->vy = -PLAYERSPEED;
-    
 }
 
 void movePlayerDown(Player *pPlayer) {
-    pPlayer->vy = +PLAYERSPEED;
-    
+    pPlayer->vy = PLAYERSPEED;
 } 
 
 void stopMovementVY(Player *pPlayer)

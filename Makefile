@@ -79,7 +79,8 @@ $(TARGET): $(OBJECTS)
 
 clean:
 ifeq ($(WINDOWS),1)
-	del /Q $(TARGET).exe $(OBJECTS)
+	powershell -Command "if (Test-Path $(TARGET).exe) { Remove-Item $(TARGET).exe }"
+	powershell -Command "Get-ChildItem $(SRCDIR)/*.o -ErrorAction SilentlyContinue | Remove-Item"
 else
 	rm -f $(TARGET) $(OBJECTS)
 endif

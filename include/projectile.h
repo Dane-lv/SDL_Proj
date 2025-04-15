@@ -4,9 +4,8 @@
 #include <SDL.h>
 #include "player.h"
 #include "camera.h"
-
-#define MAX_PROJECTILES 10
-#define PROJSPEED 400
+#include "constants.h"
+#include "maze.h"
 
 typedef struct projectile Projectile;
 
@@ -14,6 +13,9 @@ Projectile *createProjectile(SDL_Renderer *pRenderer);
 void spawnProjectile(Projectile *pProjectile[], Player *pPlayer);
 void drawProjectile(Projectile *pProjectile[], Camera *pCamera);
 void updateProjectile(Projectile *pProjectile[], float deltaTime);
+void updateProjectileWithWallCollision(Projectile *pProjectile[], Maze *pMaze, float deltaTime);
 void destroyProjectile(Projectile *pProjectile[]);
+SDL_Rect getProjectileRect(Projectile *pProjectile);
+bool isProjectileActive(Projectile *pProjectile);
 
 #endif 
