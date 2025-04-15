@@ -135,23 +135,21 @@ void updateProjectile(Projectile *pProjectile[], float deltaTime)
     {
         if (pProjectile[i]->isActive) 
         {
-           
             pProjectile[i]->projDuration -= deltaTime;
-            if (pProjectile[i]->projDuration <= 0) 
+            if (pProjectile[i]->projDuration > 0) 
+            {
+                pProjectile[i]->x += pProjectile[i]->vx * deltaTime;
+                pProjectile[i]->y += pProjectile[i]->vy * deltaTime;
+                projBounce(pProjectile[i]);
+            }
+            else 
             {
                 pProjectile[i]->isActive = false;
-                continue;
             }
-            
-           
-            pProjectile[i]->x += pProjectile[i]->vx * deltaTime;
-            pProjectile[i]->y += pProjectile[i]->vy * deltaTime;
-            
-           
-            projBounce(pProjectile[i]);
         }
     }
 }
+
 
 void destroyProjectile(Projectile *pProjectile[])
 {
