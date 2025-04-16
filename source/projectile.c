@@ -6,6 +6,7 @@
 #include "../include/constants.h"
 #include "../include/player.h"
 #include "../include/camera.h"
+#include "../include/maze.h"
 
 struct projectile
 {
@@ -16,6 +17,7 @@ struct projectile
     SDL_Renderer *pRenderer;
     SDL_Texture *pTexture;
     SDL_Rect projRect;
+    Object_ID objectID;
 };
 
 
@@ -39,6 +41,7 @@ Projectile *createProjectile(SDL_Renderer *pRenderer)
     pProjectile->projRect.w /= 2;
     pProjectile->projRect.h /= 2;
     pProjectile->isActive = false;
+    pProjectile->objectID = OBJECT_ID_PROJECTILE;
     
     return pProjectile;
 }
@@ -103,11 +106,11 @@ void drawProjectile(Projectile *pProjectile[], Camera *pCamera)
     }
 }
 
-void projBounce(Projectile *pProjectile)
+// Bounce off world boundaries
+void projBounceWorld(Projectile *pProjectile)
 {
     int halfW = pProjectile->projRect.w / 2;
     int halfH = pProjectile->projRect.h / 2;
-    
     
     if (pProjectile->x - halfW <= 0) 
     {
@@ -129,6 +132,52 @@ void projBounce(Projectile *pProjectile)
     }
 }
 
+// Check and handle wall collisions
+bool projBounceWall(Projectile *pProjectile, Maze *pMaze)
+{
+    // Create temp variables for potential next position
+    float nextX = pProjectile->x + pProjectile->vx * 0.01f; // Small movement to detect collision before it happens
+    float nextY = pProjectile->y + pProjectile->vy * 0.01f;
+    
+    // Create a temporary rect for collision testing
+    SDL_Rect tempRect = pProjectile->projRect;
+    tempRect.x = (int)nextX - tempRect.w / 2;
+    tempRect.y = (int)nextY - tempRect.h / 2;
+    
+    // Check for collision with any wall
+    if (checkCollision(pMaze, tempRect)) {
+        // Determine collision axis (X or Y or both)
+        SDL_Rect xOnlyRect = pProjectile->projRect;
+        xOnlyRect.x = (int)nextX - xOnlyRect.w / 2;
+        xOnlyRect.y = pProjectile->projRect.y;
+        
+        SDL_Rect yOnlyRect = pProjectile->projRect;
+        yOnlyRect.x = pProjectile->projRect.x;
+        yOnlyRect.y = (int)nextY - yOnlyRect.h / 2;
+        
+        bool xCollision = checkCollision(pMaze, xOnlyRect);
+        bool yCollision = checkCollision(pMaze, yOnlyRect);
+        
+        if (xCollision) {
+            pProjectile->vx = -pProjectile->vx;
+        }
+        
+        if (yCollision) {
+            pProjectile->vy = -pProjectile->vy;
+        }
+        
+        // If no specific axis collision detected but there is a collision, reverse both
+        if (!xCollision && !yCollision) {
+            pProjectile->vx = -pProjectile->vx;
+            pProjectile->vy = -pProjectile->vy;
+        }
+        
+        return true;
+    }
+    
+    return false;
+}
+
 void updateProjectile(Projectile *pProjectile[], float deltaTime)
 {
     for(int i = 0; i < MAX_PROJECTILES; i++)
@@ -140,7 +189,7 @@ void updateProjectile(Projectile *pProjectile[], float deltaTime)
             {
                 pProjectile[i]->x += pProjectile[i]->vx * deltaTime;
                 pProjectile[i]->y += pProjectile[i]->vy * deltaTime;
-                projBounce(pProjectile[i]);
+                projBounceWorld(pProjectile[i]);
             }
             else 
             {
@@ -150,6 +199,38 @@ void updateProjectile(Projectile *pProjectile[], float deltaTime)
     }
 }
 
+// Update with wall collision detection
+void updateProjectileWithWallCollision(Projectile *pProjectile[], Maze *pMaze, float deltaTime)
+{
+    for(int i = 0; i < MAX_PROJECTILES; i++)
+    {
+        if (pProjectile[i]->isActive) 
+        {
+            pProjectile[i]->projDuration -= deltaTime;
+            if (pProjectile[i]->projDuration > 0) 
+            {
+                pProjectile[i]->x += pProjectile[i]->vx * deltaTime;
+                pProjectile[i]->y += pProjectile[i]->vy * deltaTime;
+                projBounceWorld(pProjectile[i]);
+                projBounceWall(pProjectile[i], pMaze);
+            }
+            else 
+            {
+                pProjectile[i]->isActive = false;
+            }
+        }
+    }
+}
+
+SDL_Rect getProjectileRect(Projectile *pProjectile)
+{
+    return pProjectile->projRect;
+}
+
+bool isProjectileActive(Projectile *pProjectile)
+{
+    return pProjectile->isActive;
+}
 
 void destroyProjectile(Projectile *pProjectile[])
 {

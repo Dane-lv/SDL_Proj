@@ -165,19 +165,42 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
     }
     else if(pEvent->type == SDL_KEYUP)
     {
+        // Get current WASD key states
+        const Uint8 *keyState = SDL_GetKeyboardState(NULL);
+        
         switch (pEvent->key.keysym.scancode)
         {
             case SDL_SCANCODE_W:
-            case SDL_SCANCODE_S:
             case SDL_SCANCODE_UP:
+                // If S/DOWN is pressed, immediately start moving down
+                if (keyState[SDL_SCANCODE_S] || keyState[SDL_SCANCODE_DOWN])
+                    movePlayerDown(pGame->pPlayer);
+                else
+                    stopMovementVY(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_S:
             case SDL_SCANCODE_DOWN:
-                stopMovementVY(pGame->pPlayer);
+                // If W/UP is pressed, immediately start moving up
+                if (keyState[SDL_SCANCODE_W] || keyState[SDL_SCANCODE_UP])
+                    movePlayerUp(pGame->pPlayer);
+                else
+                    stopMovementVY(pGame->pPlayer);
                 break;
             case SDL_SCANCODE_A:
-            case SDL_SCANCODE_D:
             case SDL_SCANCODE_LEFT:
+                // If D/RIGHT is pressed, immediately start moving right
+                if (keyState[SDL_SCANCODE_D] || keyState[SDL_SCANCODE_RIGHT])
+                    movePlayerRight(pGame->pPlayer);
+                else
+                    stopMovementVX(pGame->pPlayer);
+                break;
+            case SDL_SCANCODE_D:
             case SDL_SCANCODE_RIGHT:
-                stopMovementVX(pGame->pPlayer);
+                // If A/LEFT is pressed, immediately start moving left
+                if (keyState[SDL_SCANCODE_A] || keyState[SDL_SCANCODE_LEFT])
+                    movePlayerLeft(pGame->pPlayer);
+                else
+                    stopMovementVX(pGame->pPlayer);
                 break;
             default:
                 break;
@@ -194,7 +217,10 @@ void updateGame(Game *pGame, float deltaTime)
     if (collision) {
         revertToPreviousPosition(pGame->pPlayer);
     }
-    updateProjectile(pGame->pProjectile, deltaTime);
+    
+    // Use the new function that includes wall collision detection
+    updateProjectileWithWallCollision(pGame->pProjectile, pGame->pMaze, deltaTime);
+    
     updateCamera(pGame->pCamera, pGame->pPlayer);
 }
 

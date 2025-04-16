@@ -15,6 +15,7 @@ struct maze {
     SDL_Surface* tileMapSurface;
     int tiles[TILE_WIDTH][TILE_HEIGHT];
     SDL_Rect tileRect;
+    Object_ID objectID;
 };
 
 Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* tileMapTexture, SDL_Surface* tileMapSurface) 
@@ -28,6 +29,7 @@ Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* tileMapTexture, SDL_Surfa
     pMaze->pRenderer = pRenderer;
     pMaze->tileMapSurface = tileMapSurface;
     pMaze->tileMapTexture = tileMapTexture;
+    pMaze->objectID = OBJECT_ID_WALL;
     
     return pMaze;
 }
@@ -158,7 +160,7 @@ void drawMap(Maze* pMaze, Camera* pCamera)
                 SDL_SetRenderDrawColor(pMaze->pRenderer, 50, 50, 50, 255);
             }
 
-            // Rendera “fylld rektangel” (eller SDL_RenderCopy om du har en textur)
+            // Rendera "fylld rektangel" (eller SDL_RenderCopy om du har en textur)
             SDL_RenderFillRect(pMaze->pRenderer, &adjustedRect);
         }
     }

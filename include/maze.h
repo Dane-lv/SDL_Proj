@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include <stdbool.h>
+#include "constants.h"
 
 // Forward declarations
 typedef struct camera Camera;

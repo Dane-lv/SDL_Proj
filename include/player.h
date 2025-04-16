@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include "camera.h"
+#include "constants.h"
 
 typedef struct player Player;
 
