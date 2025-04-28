@@ -11,6 +11,10 @@
 #define CAMERA_ZOOM 1.5
 #define TILE_WIDTH 30
 #define TILE_HEIGHT 25
+#define TILE_SIZE 32   
+#define MAX_WALLS 100  
+#define FOG_MAX_DIST 200.0f   
+#define FOG_MIN_BRIGHTNESS 0.10f 
 #define PROJSPEED 400
 #define MAX_PROJECTILES 10
 
