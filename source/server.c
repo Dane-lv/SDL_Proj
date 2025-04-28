@@ -32,11 +32,14 @@ struct dataFromClient{
 
 int main(){
     UDP_Connection conn;
-    IPaddress clients[MAX_PLAYERS] = {0};
     IPaddress client_ip;
     Data *data;
     Buffer *buffer;
     int received_len;
+    int nrOfPlayers = 1;
+    Server *server;
+
+    SDLNet_init();
 
     if(init_udp(&conn, SERVER_PORT) != 0){
         fprintf(stderr, "Failed to initialize UDP connection\n");
@@ -51,10 +54,29 @@ int main(){
             printf("Received %d bytes from %s:%d\n", received_len, SDLNet_ResolveIP(&client_ip),
                 client_ip.port);
 
-            buffer->client;
-            if(clients[0].host == 0 && clients[0].port == 0)
-                clients[];
+            if(buffer->connected == -1){
+                buffer->connected = nrOfPlayers;
+                nrOfPlayers++;
+                buffer->address = client_ip;
+            }
 
+            switch(buffer->connected){
+            case 1:
+                server->player1 = *buffer;
+                break;
+            case 2:
+                server->player2 = *buffer;
+                break;
+            case 3:
+                server->player3 = *buffer;
+                break;
+            case 4:
+                server->player4 = *buffer;
+                break;
+            default:
+                break;
+            }
+            
             send_udp(&conn, &data, sizeof(data), &client_ip);
         }
     }
@@ -64,12 +86,6 @@ int main(){
 
     return 0;
 }
-
-void establish_host(){
-
-}
-
-
 
 
 
