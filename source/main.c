@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <SDL.h>
 #include <stdbool.h>
+#include <math.h>     
 #include "../include/constants.h"
 #include "../include/player.h"
 #include "../include/camera.h"
@@ -60,7 +61,7 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;
     }
-    pGame->pRenderer = SDL_CreateRenderer(pGame->pWindow, -1, 0);
+    pGame->pRenderer = SDL_CreateRenderer(pGame->pWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
     if (!pGame->pRenderer)
     {
         printf("Renderer Creation Error: %s\n", SDL_GetError());
@@ -89,7 +90,6 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;
     }
-
 
 
     return true;
@@ -225,10 +225,12 @@ void renderGame(Game *pGame)
     SDL_RenderClear(pGame->pRenderer);
     
     // Draw background (now a solid color instead of texture)
-    drawMap(pGame->pMaze, pGame->pCamera);
+    drawMap(pGame->pMaze, pGame->pCamera, pGame->pPlayer);
     
     // Draw player
     drawPlayer(pGame->pPlayer, pGame->pCamera);
+
+    SDL_RenderPresent(pGame->pRenderer);
     
     // Present the rendered frame
     SDL_RenderPresent(pGame->pRenderer);
