@@ -14,6 +14,8 @@
 #define PROJSPEED 400
 #define MAX_PROJECTILES 10
 
+#define MAX_PLAYERS 4
+
 typedef enum {
     OBJECT_ID_PLAYER,
     OBJECT_ID_WALL,
