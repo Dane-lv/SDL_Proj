@@ -4,6 +4,7 @@
 #include <SDL.h>
 #include <stdbool.h>
 #include "../include/player.h"
+#include "constants.h"
 
 // Forward declarations
 typedef struct camera Camera;

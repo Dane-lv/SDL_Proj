@@ -3,6 +3,7 @@
 
 #include <SDL.h>
 #include "camera.h"
+#include "constants.h"
 
 typedef struct player Player;
 
@@ -23,10 +24,9 @@ SDL_Texture *getPlayerTexture(Player *pPlayer);
 SDL_Rect getPlayerRect(Player *pPlayer);
 void setPlayerPosition(Player *pPlayer, float x, float y);
 void setPlayerAngle(Player *pPlayer, float angle);
+float getPlayerAngle(Player *pPlayer);
+float getGunTipPosX(Player *pPlayer);
+float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
-
-
-
-
 
 #endif 
