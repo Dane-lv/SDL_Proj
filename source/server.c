@@ -25,7 +25,9 @@ struct dataToClient{
 
 struct dataFromClient{
     int connected;
+    IPaddress address;
     Player *player;
+    SDL_Event event;
 }; typedef struct dataFromClient Buffer;
 
 int main(){
