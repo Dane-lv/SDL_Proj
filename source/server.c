@@ -12,29 +12,24 @@
 
 #define SERVER_PORT 2000
 
-struct server{
-    Buffer players[MAX_PLAYERS];
-}; typedef struct server Server;
+typedef struct{
+    ClientInfo players[MAX_PLAYERS];
+} ServerInfo;
 
-struct dataToClient{
-    //
-}; typedef struct dataToClient Data;
-
-struct dataFromClient{
+typedef struct {
     int connection_state;
     IPaddress address;
     Player *player;
     SDL_Event event;
-}; typedef struct dataFromClient Buffer;
+} ClientInfo;
 
 int main(){
     UDP_Connection conn;
     IPaddress client_ip;
-    Data *data;
-    Buffer *buffer;
+    ServerInfo *data;
+    ClientInfo *buffer;
     int received_len;
     int nrOfPlayers = 0;
-    Server *server;
 
     SDLNet_init();
 
@@ -57,7 +52,7 @@ int main(){
                 buffer->address = client_ip;
             }
 
-            server->players[buffer->connection_state] = *buffer;
+            data->players[buffer->connection_state] = *buffer;
             
             send_udp(&conn, &data, sizeof(data), &client_ip);
         }
