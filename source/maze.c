@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>     
 #include <SDL.h>
 #include <SDL_image.h>
 #include "../include/maze.h"
 #include "../include/constants.h"
 #include "../include/camera.h"
+#include "../include/player.h"
 
-#define MAX_WALLS 100
 
 struct maze {
     SDL_Renderer* pRenderer;
@@ -36,19 +37,37 @@ Maze* createMaze(SDL_Renderer* pRenderer, SDL_Texture* tileMapTexture, SDL_Surfa
 
 void generateMazeLayout(Maze* pMaze)
 {
-    // 0 = golv, 1 = vägg
+    // 1 = golv, 2 = vägg
     for (int x = 0; x < TILE_WIDTH; x++)
     {
         for (int y = 0; y < TILE_HEIGHT; y++)
         {
             // Gör kanterna till vägg
             if (x == 0 || x == TILE_WIDTH-1 || y == 0 || y == TILE_HEIGHT-1) {
-                pMaze->tiles[x][y] = 2; // "2" kanske betyder vägg
+                pMaze->tiles[x][y] = 2; // "2" betyder vägg
             } else {
-                pMaze->tiles[x][y] = 1; // "1" kanske betyder golv
+                pMaze->tiles[x][y] = 1; // "1" betyder golv
             }
         }
     }
+    addWall(pMaze,  5,  5, 10,  5); // Horisontell
+    addWall(pMaze, 10,  0, 10, 10); // Vertikal
+    addWall(pMaze,  8, 11, 12, 11); // Horisontell
+    addWall(pMaze,  5,  8,  5, 15); // Vertikal
+    addWall(pMaze,  0, 16,  8, 16); // ...
+    addWall(pMaze, 12, 16, 15, 16);
+    addWall(pMaze, 16,  8, 16, 20);
+    addWall(pMaze, 16,  3, 16,  5);
+    addWall(pMaze, 13,  3, 22,  3);
+    addWall(pMaze, 20,  4, 20, 10);
+    addWall(pMaze, 20, 11, 23, 11);
+    addWall(pMaze, 24, 11, 24, 14);
+    addWall(pMaze, 24, 18, 24, 24);
+    addWall(pMaze, 20, 19, 24, 19);
+    addWall(pMaze,  5, 20, 11, 20);
+    addWall(pMaze, 12, 17, 12, 21);
+    addWall(pMaze, 25,  5, 25,  8);
+    addWall(pMaze, 25,  8, 29,  8);
 }
 
 void destroyMaze(Maze* pMaze) 
@@ -119,46 +138,45 @@ void addWall(Maze* pMaze, int x1, int y1, int x2, int y2)
     }
 }
 
-void drawMap(Maze* pMaze, Camera* pCamera)
+void drawMap(Maze* pMaze, Camera* pCamera, Player* pPlayer)
 {
+    SDL_Rect pr = getPlayerRect(pPlayer);
+    float px = pr.x + pr.w * 0.5f;
+    float py = pr.y + pr.h * 0.5f;
     for (int x = 0; x < TILE_WIDTH; x++)
     {
         for (int y = 0; y < TILE_HEIGHT; y++)
         {
             int worldX = x * 32;
             int worldY = y * 32;
+            float cx = worldX + 16;        
+            float cy = worldY + 16;
+            float dx = cx - px;
+            float dy = cy - py;
+            float dist = sqrtf(dx*dx + dy*dy);
+
+            float t = 1.0f - dist / FOG_MAX_DIST;      
+            if (t < 0.0f) t = 0.0f;
+            float b = FOG_MIN_BRIGHTNESS + t * (1.0f - FOG_MIN_BRIGHTNESS);
+            /* ---------- skala varje kanal ---------- */
+            Uint8 wallR  = (Uint8)(  0 * b);      /* cyan-väggar: R=0 */
+            Uint8 wallG  = (Uint8)(255 * b);      /*                 G=255 */
+            Uint8 wallB  = (Uint8)(255 * b);      /*                 B=255 */
+
+            Uint8 floorR = (Uint8)( 50 * b);      /* mörkgrått golv */
+            Uint8 floorG = (Uint8)( 50 * b);
+            Uint8 floorB = (Uint8)( 70 * b);
+            
             pMaze->tileRect.x = worldX;
             pMaze->tileRect.y = worldY;
-            pMaze->tileRect.w = 30;
-            pMaze->tileRect.h = 30;
-            addWall(pMaze,  5,  5, 10,  5); // Horisontell
-            addWall(pMaze, 10,  0, 10, 10); // Vertikal
-            addWall(pMaze,  8, 11, 12, 11); // Horisontell
-            addWall(pMaze,  5,  8,  5, 15); // Vertikal
-            addWall(pMaze,  0, 16,  8, 16); // ...
-            addWall(pMaze, 12, 16, 15, 16);
-            addWall(pMaze, 16,  8, 16, 20);
-            addWall(pMaze, 16,  3, 16,  5);
-            addWall(pMaze, 13,  3, 22,  3);
-            addWall(pMaze, 20,  4, 20, 10);
-            addWall(pMaze, 20, 11, 23, 11);
-            addWall(pMaze, 24, 11, 24, 14);
-            addWall(pMaze, 24, 18, 24, 24);
-            addWall(pMaze, 20, 19, 24, 19);
-            addWall(pMaze,  5, 20, 11, 20);
-            addWall(pMaze, 12, 17, 12, 21);
-            addWall(pMaze, 25,  5, 25,  8);
-            addWall(pMaze, 25,  8, 29,  8);
+            pMaze->tileRect.w = 32;
+            pMaze->tileRect.h = 32;
             // Konvertera från världskoordinater till skärmkoordinater via kameran
             SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, pMaze->tileRect);
-            if (pMaze->tiles[x][y] == 2) {
-                // Vägg
-                SDL_SetRenderDrawColor(pMaze->pRenderer, 255, 255, 255, 255);
-            }
-            else {
-                // Golv
-                SDL_SetRenderDrawColor(pMaze->pRenderer, 50, 50, 50, 255);
-            }
+            if (pMaze->tiles[x][y] == 2)          /* vägg */
+                SDL_SetRenderDrawColor(pMaze->pRenderer, wallR, wallG, wallB, 255);
+            else                                  /* golv */
+                SDL_SetRenderDrawColor(pMaze->pRenderer, floorR, floorG, floorB, 255);
 
             // Rendera "fylld rektangel" (eller SDL_RenderCopy om du har en textur)
             SDL_RenderFillRect(pMaze->pRenderer, &adjustedRect);
