@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <SDL.h>
 #include <stdbool.h>
+#include <math.h>     
 #include "../include/constants.h"
 #include "../include/player.h"
 #include "../include/camera.h"
@@ -29,7 +30,6 @@ void run(Game *pGame);
 void handleInput(Game *pGame, SDL_Event *pEvent);
 void updateGame(Game *pGame, float deltaTime);
 void renderGame(Game *pGame);
-void drawCheckerboard(Game *pGame);
 void updatePlayerRotation(Game *pGame);
 
 int main(int argc, char** argv)
@@ -57,7 +57,7 @@ bool initiateGame(Game *pGame)
         closeGame(pGame);
         return false;
     }
-    pGame->pRenderer = SDL_CreateRenderer(pGame->pWindow, -1, 0);
+    pGame->pRenderer = SDL_CreateRenderer(pGame->pWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
     if (!pGame->pRenderer)
     {
         printf("Renderer Creation Error: %s\n", SDL_GetError());
@@ -165,42 +165,19 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
     }
     else if(pEvent->type == SDL_KEYUP)
     {
-        // Get current WASD key states
-        const Uint8 *keyState = SDL_GetKeyboardState(NULL);
-        
         switch (pEvent->key.keysym.scancode)
         {
             case SDL_SCANCODE_W:
-            case SDL_SCANCODE_UP:
-                // If S/DOWN is pressed, immediately start moving down
-                if (keyState[SDL_SCANCODE_S] || keyState[SDL_SCANCODE_DOWN])
-                    movePlayerDown(pGame->pPlayer);
-                else
-                    stopMovementVY(pGame->pPlayer);
-                break;
             case SDL_SCANCODE_S:
+            case SDL_SCANCODE_UP:
             case SDL_SCANCODE_DOWN:
-                // If W/UP is pressed, immediately start moving up
-                if (keyState[SDL_SCANCODE_W] || keyState[SDL_SCANCODE_UP])
-                    movePlayerUp(pGame->pPlayer);
-                else
-                    stopMovementVY(pGame->pPlayer);
+                stopMovementVY(pGame->pPlayer);
                 break;
             case SDL_SCANCODE_A:
-            case SDL_SCANCODE_LEFT:
-                // If D/RIGHT is pressed, immediately start moving right
-                if (keyState[SDL_SCANCODE_D] || keyState[SDL_SCANCODE_RIGHT])
-                    movePlayerRight(pGame->pPlayer);
-                else
-                    stopMovementVX(pGame->pPlayer);
-                break;
             case SDL_SCANCODE_D:
+            case SDL_SCANCODE_LEFT:
             case SDL_SCANCODE_RIGHT:
-                // If A/LEFT is pressed, immediately start moving left
-                if (keyState[SDL_SCANCODE_A] || keyState[SDL_SCANCODE_LEFT])
-                    movePlayerLeft(pGame->pPlayer);
-                else
-                    stopMovementVX(pGame->pPlayer);
+                stopMovementVX(pGame->pPlayer);
                 break;
             default:
                 break;
@@ -210,17 +187,20 @@ void handleInput(Game *pGame, SDL_Event *pEvent)
 
 void updateGame(Game *pGame, float deltaTime)
 {
+    // Update player position
     updatePlayer(pGame->pPlayer, deltaTime);
     
+    // Check collision and revert if needed
     SDL_Rect playerRect = getPlayerRect(pGame->pPlayer);
     bool collision = checkCollision(pGame->pMaze, playerRect);
     if (collision) {
         revertToPreviousPosition(pGame->pPlayer);
     }
     
-    // Use the new function that includes wall collision detection
+    // Update projectiles with wall collision detection
     updateProjectileWithWallCollision(pGame->pProjectile, pGame->pMaze, deltaTime);
     
+    // Update camera after final player position is determined
     updateCamera(pGame->pCamera, pGame->pPlayer);
 }
 
@@ -229,15 +209,24 @@ void updatePlayerRotation(Game *pGame)
     // Get mouse position in screen coordinates
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
+    
+    // Get player position in world coordinates
     SDL_Rect playerPos = getPlayerPosition(pGame->pPlayer);
+    
+    // Convert player position to screen coordinates using camera
     SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(pGame->pCamera, playerPos);
+    
+    // Calculate player center in screen coordinates
     float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
     float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
     
+    // Calculate angle between player center and mouse
     float deltaX = mouseX - playerCenterX;
     float deltaY = mouseY - playerCenterY;
     float radians = atan2f(deltaY, deltaX);
     float angle = radians * 180.0f / 3.14;
+    
+    // Update player angle
     setPlayerAngle(pGame->pPlayer, angle);
 }
 
@@ -246,17 +235,25 @@ void renderGame(Game *pGame)
     // Clear with a dark background
     SDL_SetRenderDrawColor(pGame->pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(pGame->pRenderer);
-
-    drawMap(pGame->pMaze, pGame->pCamera);
-    drawPlayer(pGame->pPlayer, pGame->pCamera);
-    drawProjectile(pGame->pProjectile, pGame->pCamera);
     
+    // Draw background (now a solid color instead of texture)
+    drawMap(pGame->pMaze, pGame->pCamera, pGame->pPlayer);
+    
+    // Draw player
+    drawPlayer(pGame->pPlayer, pGame->pCamera);
+    
+    // Draw projectiles
+    drawProjectile(pGame->pProjectile, pGame->pCamera);
+
+    // Present the rendered frame
     SDL_RenderPresent(pGame->pRenderer);
 }
 
 void closeGame(Game *pGame)
 {
+    // Destroy projectiles
     destroyProjectile(pGame->pProjectile);
+    
     if(pGame->pPlayer) 
         destroyPlayer(pGame->pPlayer);
     if(pGame->pCamera)
