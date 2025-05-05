@@ -1,14 +1,13 @@
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_net.h>
-#include <SDL_ttf.h>                /* --- NEW --- */
+#include <SDL_ttf.h>             
 #include <stdbool.h>
 #include <string.h>
-
 #include "../include/constants.h"
 #include "../include/game_core.h"
 #include "../include/network.h"
-#include "../include/menu.h"        /* --- NEW --- */
+#include "../include/menu.h"        
 
 #define DEFAULT_PORT 7777
 

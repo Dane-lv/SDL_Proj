@@ -15,16 +15,11 @@ typedef enum
 
 typedef struct menu Menu;
 
-/* Skapande / förstörande */
-Menu        *menuCreate(SDL_Renderer *r, SDL_Window *w);
-void         menuDestroy(Menu *m);
+Menu *menuCreate(SDL_Renderer *r, SDL_Window *w);
+void menuDestroy(Menu *m);
+bool menuHandleEvent(Menu *m, const SDL_Event *e);
+void menuRender(Menu *m);
+MenuChoice menuGetChoice(const Menu *m);
+const char *menuGetJoinIP(const Menu *m);   
 
-/* Händelser / rendering */
-bool         menuHandleEvent(Menu *m, const SDL_Event *e);
-void         menuRender(Menu *m);
-
-/* Resultat när användaren är klar */
-MenuChoice   menuGetChoice(const Menu *m);
-const char  *menuGetJoinIP(const Menu *m);   /* tom sträng om inget angivet */
-
-#endif /* MENU_H */
+#endif 

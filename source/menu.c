@@ -1,8 +1,6 @@
 #include "../include/menu.h"
 
-/* --------------------------------------------------------- */
-/* interna strukturer                                         */
-/* --------------------------------------------------------- */
+
 struct button { SDL_Rect rect; const char *label; };
 
 typedef enum { MODE_MAIN, MODE_JOIN } MenuMode;
@@ -295,6 +293,5 @@ void menuRender(Menu *m)
     SDL_RenderPresent(m->r);
 }
 
-/* --------------------------------------------------------- */
 MenuChoice menuGetChoice(const Menu *m)  { return m->choice; }
 const char *menuGetJoinIP(const Menu *m) { return m->ip;     }
