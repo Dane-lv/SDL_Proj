@@ -309,14 +309,11 @@ void gameCoreShutdown(GameContext *ctx) {
 }
 
 void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const void *data, int size) {
-    // Ensure player ID is valid
     if (playerId >= MAX_PLAYERS) return;
     
     switch (type) {
         case MSG_JOIN: {
-            // Server assigned us a player ID
             if (ctx->netMgr.localPlayerId == playerId) {
-                // This is for the local player, update player array
                 if (ctx->players[0] == ctx->localPlayer) {
                     ctx->players[0] = NULL;
                 }
@@ -325,7 +322,6 @@ void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const vo
             break;
         }
         case MSG_POS: {
-            // Ensure data contains position information
             if ((unsigned int)size < sizeof(float) * 3) return;
             
             float x = *((float*)data);

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define MAX_PLAYERS 5      // total slots
-#define BUF_SIZE    1024   // header + payload
+#define BUF_SIZE    1024   
 
 // Message types
 enum {
