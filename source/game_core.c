@@ -184,7 +184,6 @@ void handleInput(GameContext *ctx, SDL_Event *event) {
                 
                 // Send shoot event over network
                 if (ctx->isNetworked && ctx->netMgr.localPlayerId != 0xFF) {
-                    // Instead of getting gun tip position, use player position and angle
                     SDL_Rect playerPos = getPlayerPosition(ctx->localPlayer);
                     float playerX = (float)(playerPos.x + playerPos.w/2);
                     float playerY = (float)(playerPos.y + playerPos.h/2);
@@ -216,35 +215,31 @@ void handleInput(GameContext *ctx, SDL_Event *event) {
 }
 
 void updateGame(GameContext *ctx, float deltaTime) {
-    // Update player position
+
     updatePlayer(ctx->localPlayer, deltaTime);
     
-    // Check collision and revert if needed
     SDL_Rect playerRect = getPlayerRect(ctx->localPlayer);
     bool collision = checkCollision(ctx->maze, playerRect);
     if (collision) {
         revertToPreviousPosition(ctx->localPlayer);
     }
     
-    // Update projectiles with wall collision detection
     updateProjectileWithWallCollision(ctx->projectiles, ctx->maze, deltaTime);
     
-    // Update camera after final player position is determined
     updateCamera(ctx->camera, ctx->localPlayer);
 }
 
 void updatePlayerRotation(GameContext *ctx) {
-    // Get mouse position in screen coordinates
+  
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
     
-    // Get player position in world coordinates
+ 
     SDL_Rect playerPos = getPlayerPosition(ctx->localPlayer);
     
-    // Convert player position to screen coordinates using camera
     SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(ctx->camera, playerPos);
     
-    // Calculate player center in screen coordinates
+   
     float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
     float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
     
@@ -259,29 +254,28 @@ void updatePlayerRotation(GameContext *ctx) {
 }
 
 void renderGame(GameContext *ctx) {
-    // Clear with a dark background
+  
     SDL_SetRenderDrawColor(ctx->renderer, 0, 0, 0, 255);
     SDL_RenderClear(ctx->renderer);
     
-    // Draw background (now a solid color instead of texture)
     drawMap(ctx->maze, ctx->camera, ctx->localPlayer);
     
-    // Draw all players
+   
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (ctx->players[i] != NULL) {
             drawPlayer(ctx->players[i], ctx->camera);
         }
     }
     
-    // Draw projectiles
+   
     drawProjectile(ctx->projectiles, ctx->camera);
 
-    // Present the rendered frame
+   
     SDL_RenderPresent(ctx->renderer);
 }
 
 void gameCoreShutdown(GameContext *ctx) {
-    // Clean up projectiles
+  
     destroyProjectile(ctx->projectiles);
 
     if (ctx->camera) {
