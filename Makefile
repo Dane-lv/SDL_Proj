@@ -28,13 +28,13 @@ endif
 # Apply macOS settings (if detected)
 ifeq ($(MACOS),1)
     CFLAGS  += -I/opt/homebrew/include/SDL2
-    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf -lSDL2_image
+    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
 endif
 
 # Apply Linux settings (if detected)
 ifeq ($(LINUX),1)
     CFLAGS  += $(shell sdl2-config --cflags)
-    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf
+    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_net
 endif
 
 # Windows SDL2 detection - first option (vcpkg)
@@ -42,7 +42,7 @@ ifeq ($(WINDOWS),1)
     ifneq ("$(wildcard C:/vcpkg/installed/x64-windows/include/SDL2)","")
         SDL2_FOUND = 1
         CFLAGS  += -IC:/vcpkg/installed/x64-windows/include -IC:/vcpkg/installed/x64-windows/include/SDL2
-        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image
+        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
     endif
 endif
 
@@ -52,7 +52,7 @@ ifeq ($(WINDOWS),1)
         ifneq ("$(wildcard C:/msys64/mingw64/include/SDL2)","")
             SDL2_FOUND = 1
             CFLAGS  += -IC:/msys64/mingw64/include -IC:/msys64/mingw64/include/SDL2
-            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image
+            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
         endif
     endif
 endif
@@ -65,13 +65,22 @@ ifeq ($(WINDOWS),1)
 endif
 
 SRCDIR   = source
-SOURCES  = $(wildcard $(SRCDIR)/*.c)
-OBJECTS  = $(SOURCES:.c=.o)
-TARGET   = game
+CORE_SOURCES = $(SRCDIR)/game_core.c $(SRCDIR)/maze.c $(SRCDIR)/player.c $(SRCDIR)/projectile.c $(SRCDIR)/network.c $(SRCDIR)/camera.c
+SERVER_SOURCES = $(SRCDIR)/server.c
+CLIENT_SOURCES = $(SRCDIR)/client.c
 
-all: $(TARGET)
+SERVER_OBJECTS = $(SERVER_SOURCES:.c=.o) $(CORE_SOURCES:.c=.o)
+CLIENT_OBJECTS = $(CLIENT_SOURCES:.c=.o) $(CORE_SOURCES:.c=.o)
 
-$(TARGET): $(OBJECTS)
+SERVER_TARGET = server
+CLIENT_TARGET = client
+
+all: $(SERVER_TARGET) $(CLIENT_TARGET)
+
+$(SERVER_TARGET): $(SERVER_OBJECTS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+$(CLIENT_TARGET): $(CLIENT_OBJECTS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
@@ -79,8 +88,9 @@ $(TARGET): $(OBJECTS)
 
 clean:
 ifeq ($(WINDOWS),1)
-	powershell -Command "if (Test-Path $(TARGET).exe) { Remove-Item $(TARGET).exe }"
+	powershell -Command "if (Test-Path $(SERVER_TARGET).exe) { Remove-Item $(SERVER_TARGET).exe }"
+	powershell -Command "if (Test-Path $(CLIENT_TARGET).exe) { Remove-Item $(CLIENT_TARGET).exe }"
 	powershell -Command "Get-ChildItem $(SRCDIR)/*.o -ErrorAction SilentlyContinue | Remove-Item"
 else
-	rm -f $(TARGET) $(OBJECTS)
+	rm -f $(SERVER_TARGET) $(CLIENT_TARGET) $(SERVER_OBJECTS) $(CLIENT_OBJECTS)
 endif
