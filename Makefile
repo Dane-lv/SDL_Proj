@@ -65,13 +65,22 @@ ifeq ($(WINDOWS),1)
 endif
 
 SRCDIR   = source
-SOURCES  = $(wildcard $(SRCDIR)/*.c)
-OBJECTS  = $(SOURCES:.c=.o)
-TARGET   = game
+CORE_SOURCES = $(SRCDIR)/game_core.c $(SRCDIR)/maze.c $(SRCDIR)/player.c $(SRCDIR)/projectile.c $(SRCDIR)/network.c $(SRCDIR)/camera.c
+SERVER_SOURCES = $(SRCDIR)/server.c
+CLIENT_SOURCES = $(SRCDIR)/client.c
 
-all: $(TARGET)
+SERVER_OBJECTS = $(SERVER_SOURCES:.c=.o) $(CORE_SOURCES:.c=.o)
+CLIENT_OBJECTS = $(CLIENT_SOURCES:.c=.o) $(CORE_SOURCES:.c=.o)
 
-$(TARGET): $(OBJECTS)
+SERVER_TARGET = server
+CLIENT_TARGET = client
+
+all: $(SERVER_TARGET) $(CLIENT_TARGET)
+
+$(SERVER_TARGET): $(SERVER_OBJECTS)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+$(CLIENT_TARGET): $(CLIENT_OBJECTS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
@@ -79,8 +88,9 @@ $(TARGET): $(OBJECTS)
 
 clean:
 ifeq ($(WINDOWS),1)
-	powershell -Command "if (Test-Path $(TARGET).exe) { Remove-Item $(TARGET).exe }"
+	powershell -Command "if (Test-Path $(SERVER_TARGET).exe) { Remove-Item $(SERVER_TARGET).exe }"
+	powershell -Command "if (Test-Path $(CLIENT_TARGET).exe) { Remove-Item $(CLIENT_TARGET).exe }"
 	powershell -Command "Get-ChildItem $(SRCDIR)/*.o -ErrorAction SilentlyContinue | Remove-Item"
 else
-	rm -f $(TARGET) $(OBJECTS)
+	rm -f $(SERVER_TARGET) $(CLIENT_TARGET) $(SERVER_OBJECTS) $(CLIENT_OBJECTS)
 endif

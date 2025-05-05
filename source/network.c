@@ -1,9 +1,15 @@
 #include "../include/network.h"
+#include "../include/game_core.h"
 #include <string.h>
 #include <stdio.h>
 
-// Function to handle network data (declared here, implemented in main.c)
-extern void handleNetworkData(Uint8 type, Uint8 playerId, const void *data, int size);
+// Local function for dispatching network messages
+static void dispatchMessage(NetMgr *nm, Uint8 type, Uint8 playerId, const void *data, int size) {
+    if (nm->userData) {
+        GameContext *ctx = (GameContext*)nm->userData;
+        gameOnNetworkMessage(ctx, type, playerId, data, size);
+    }
+}
 
 bool netInit(void) {
     return SDLNet_Init() == 0;
@@ -50,7 +56,9 @@ bool hostStart(NetMgr *nm, int port) {
 }
 
 // Called each frame by host
-void hostTick(NetMgr *nm) {
+void hostTick(NetMgr *nm, void *ctx) {
+    nm->userData = ctx;
+    
     int ready = SDLNet_CheckSockets(nm->set, 0);
     if (ready <= 0) return;
 
@@ -102,9 +110,9 @@ void hostTick(NetMgr *nm) {
                 MessageHeader *header = (MessageHeader*)nm->buf;
                 
                 // Process message locally first
-                handleNetworkData(header->type, header->playerId, 
-                                 nm->buf + sizeof(MessageHeader), 
-                                 header->size);
+                dispatchMessage(nm, header->type, header->playerId, 
+                               nm->buf + sizeof(MessageHeader), 
+                               header->size);
                 
                 // Broadcast to all other clients
                 for (int j = 0; j < nm->peerCount; ++j) {
@@ -153,7 +161,9 @@ bool clientConnect(NetMgr *nm, const char *ip, int port) {
 }
 
 // Called each frame by client
-void clientTick(NetMgr *nm) {
+void clientTick(NetMgr *nm, void *ctx) {
+    nm->userData = ctx;
+    
     int ready = SDLNet_CheckSockets(nm->set, 0);
     if (ready <= 0) return;
     
@@ -170,12 +180,12 @@ void clientTick(NetMgr *nm) {
             if (header->type == MSG_JOIN && nm->localPlayerId == 0xFF) {
                 nm->localPlayerId = header->playerId;
                 printf("Assigned player ID: %d\n", nm->localPlayerId);
-            } else {
-                // Process received data
-                handleNetworkData(header->type, header->playerId,
-                                 nm->buf + sizeof(MessageHeader),
-                                 header->size);
             }
+            
+            // Process received data
+            dispatchMessage(nm, header->type, header->playerId,
+                          nm->buf + sizeof(MessageHeader),
+                          header->size);
         }
     }
 }
@@ -214,7 +224,7 @@ bool sendPlayerPosition(NetMgr *nm, float x, float y, float angle) {
             }
         }
         // Also process locally
-        handleNetworkData(MSG_POS, nm->localPlayerId, nm->buf + sizeof(MessageHeader), header.size);
+        dispatchMessage(nm, MSG_POS, nm->localPlayerId, nm->buf + sizeof(MessageHeader), header.size);
         return true;
     } else {
         // Client sends to host
@@ -257,7 +267,7 @@ bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle) {
             }
         }
         // Also process locally
-        handleNetworkData(MSG_SHOOT, nm->localPlayerId, nm->buf + sizeof(MessageHeader), header.size);
+        dispatchMessage(nm, MSG_SHOOT, nm->localPlayerId, nm->buf + sizeof(MessageHeader), header.size);
         return true;
     } else {
         // Client sends to host

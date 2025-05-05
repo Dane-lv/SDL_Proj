@@ -33,6 +33,7 @@ typedef struct {
     char           buf[BUF_SIZE];        // single fixed buffer
     bool           isHost;
     Uint8          localPlayerId;        // ID of local player (assigned by host)
+    void*          userData;             // Pointer to game context
 } NetMgr;
 
 bool  netInit(void);
@@ -40,11 +41,11 @@ void  netShutdown(void);
 
 // Host functions
 bool  hostStart(NetMgr *nm, int port);
-void  hostTick(NetMgr *nm);
+void  hostTick(NetMgr *nm, void *ctx);
 
 // Client functions
 bool  clientConnect(NetMgr *nm, const char *ip, int port);
-void  clientTick(NetMgr *nm);
+void  clientTick(NetMgr *nm, void *ctx);
 
 // Send functions
 bool  sendPlayerPosition(NetMgr *nm, float x, float y, float angle);
