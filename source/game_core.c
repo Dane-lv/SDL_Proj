@@ -322,18 +322,19 @@ void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const vo
             break;
         }
         case MSG_POS: {
-            if ((unsigned int)size < sizeof(float) * 3) return;
+            if (size < 3.0 * sizeof(float)) return;
+
+            float* posData = (float*)data;
+            float x = posData[0];
+            float y = posData[1];
+            float angle = posData[2];
             
-            float x = *((float*)data);
-            float y = *((float*)data + 1);
-            float angle = *((float*)data + 2);
-            
-            // Create remote player if it doesn't exist
+            // skapa icke lokal spelare 
             if (ctx->players[playerId] == NULL && playerId != ctx->netMgr.localPlayerId) {
                 ctx->players[playerId] = createPlayer(ctx->renderer);
                 if (!ctx->players[playerId]) return;
                 
-                // Set the initial position
+                // positions  of players
                 setPlayerPosition(ctx->players[playerId], x, y);
                 setPlayerAngle(ctx->players[playerId], angle);
                 
@@ -342,17 +343,15 @@ void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const vo
             
             // Skip updating if it's our local player
             if (playerId != ctx->netMgr.localPlayerId) {
-                // Update remote player position and angle
+                // updatera spelaren
                 setPlayerPosition(ctx->players[playerId], x, y);
                 setPlayerAngle(ctx->players[playerId], angle);
             }
             break;
         }
         case MSG_SHOOT: {
-            // Ensure data contains shoot information
-            if ((unsigned int)size < sizeof(float) * 3) return;
-            
-            // Skip if it's our local player (we already spawned the projectile)
+            if (size < 3.0 * sizeof(float)) return;
+
             if (playerId == ctx->netMgr.localPlayerId) return;
             
             // Ensure remote player exists
@@ -363,8 +362,8 @@ void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const vo
             break;
         }
         case MSG_LEAVE: {
-            // Handle player disconnection
-            if (playerId != ctx->netMgr.localPlayerId && ctx->players[playerId]) {
+            
+                if (playerId != ctx->netMgr.localPlayerId && ctx->players[playerId]) {
                 destroyPlayer(ctx->players[playerId]);
                 ctx->players[playerId] = NULL;
             }
