@@ -242,6 +242,14 @@ float getProjectileAge(Projectile *pProjectile)
     return 3.0f - pProjectile->projDuration;
 }
 
+// Deactivate a projectile
+void deactivateProjectile(Projectile *pProjectile)
+{
+    if (pProjectile) {
+        pProjectile->isActive = false;
+    }
+}
+
 void destroyProjectile(Projectile *pProjectile[])
 {
     for(int i = 0; i < MAX_PROJECTILES; i++)

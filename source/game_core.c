@@ -289,6 +289,9 @@ void checkProjectilePlayerCollisions(GameContext *ctx) {
                         // Eliminate the player
                         eliminatePlayer(ctx->players[j]);
                         
+                        // Deactivate the projectile
+                        deactivateProjectile(ctx->projectiles[i]);
+                        
                         // Play game over sound if local player is eliminated
                         if (ctx->players[j] == ctx->localPlayer) {
                             playGameOverSound(&ctx->audioManager);
