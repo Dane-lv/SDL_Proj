@@ -67,7 +67,9 @@ bool gameInit(GameContext *game) {
             setWindowTitle(game, "Maze Mayhem - HOST");
             
             // For host, player ID is always 0
-            setPlayerPosition(game->localPlayer, 400, 300);
+            // Spawn host (Player 0) in the Top-Left corner
+            float corner_margin = 50.0f; // Margin from the absolute corner
+            setPlayerPosition(game->localPlayer, corner_margin, corner_margin);
         } else {
             setWindowTitle(game, "Maze Mayhem - CLIENT");
         }
@@ -120,9 +122,29 @@ void gameCoreRunFrame(GameContext *game) {
             
             // If we're a client and we just got assigned a player ID, set initial position
             if (!initialPosSet && game->netMgr.localPlayerId != 0xFF) {
-                // Set different starting positions based on player ID
-                float startX = 300.0f + (game->netMgr.localPlayerId * 100);
-                float startY = 200.0f + (game->netMgr.localPlayerId * 80);
+                float startX, startY;
+                float corner_margin = 50.0f; // Margin from the absolute corner
+                Uint8 id = game->netMgr.localPlayerId;
+
+                if (id == 1) { // Top-Right
+                    startX = WINDOW_WIDTH - PLAYERWIDTH - corner_margin;
+                    startY = corner_margin;
+                } else if (id == 2) { // Bottom-Left
+                    startX = corner_margin;
+                    startY = WINDOW_HEIGHT - (2 * PLAYERHEIGHT) - corner_margin;
+                } else if (id == 3) { // Bottom-Right
+                    startX = WINDOW_WIDTH - PLAYERWIDTH - corner_margin;
+                    startY = WINDOW_HEIGHT - PLAYERHEIGHT - corner_margin;
+                } else if (id == 4) { // Center
+                    startX = WINDOW_WIDTH / 2.0f - PLAYERWIDTH / 2.0f;
+                    startY = WINDOW_HEIGHT / 2.0f - PLAYERHEIGHT / 2.0f;
+                } else {
+                    // Fallback for unexpected IDs or if MAX_PLAYERS is increased
+                    // Default to a slightly offset position
+                    startX = 100.0f + (id * PLAYERWIDTH * 1.5f); // Spread them out a bit
+                    startY = 100.0f;
+                }
+
                 setPlayerPosition(game->localPlayer, startX, startY);
                 initialPosSet = true;
                 
