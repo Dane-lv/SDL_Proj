@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #include <math.h>
+#include <stdbool.h>
 #include "../include/player.h"
 #include "../include/constants.h"
 #include "../include/camera.h"
@@ -15,6 +16,7 @@ struct player
     SDL_Texture *pTexture;
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
     Object_ID objectID;
+    bool isEliminated; // Flag to track if player is eliminated
 }; 
 
 Player *createPlayer(SDL_Renderer *pRenderer)
@@ -42,6 +44,7 @@ Player *createPlayer(SDL_Renderer *pRenderer)
     pPlayer->vy = 0;
     pPlayer->angle = 0;
     pPlayer->objectID = OBJECT_ID_PLAYER;
+    pPlayer->isEliminated = false; // Initialize as not eliminated
     
     // Set explicit dimensions instead of querying texture
     pPlayer->playerRect.x = (int)pPlayer->x;
@@ -63,6 +66,11 @@ void drawPlayer(Player *pPlayer, Camera *pCamera)
 
 void updatePlayer(Player *pPlayer, float deltaTime)
 {
+    // Don't update if player is eliminated
+    if (pPlayer->isEliminated) {
+        return;
+    }
+    
     pPlayer->prevX = pPlayer->x;
     pPlayer->prevY = pPlayer->y;
     
@@ -86,18 +94,26 @@ void updatePlayer(Player *pPlayer, float deltaTime)
 }
 
 void movePlayerLeft(Player *pPlayer) {
+    // Don't move if player is eliminated
+    if (pPlayer->isEliminated) return;
     pPlayer->vx = -PLAYERSPEED;
 }
 
 void movePlayerRight(Player *pPlayer) {
+    // Don't move if player is eliminated
+    if (pPlayer->isEliminated) return;
     pPlayer->vx = PLAYERSPEED;
 }
 
 void movePlayerUp(Player *pPlayer) {
+    // Don't move if player is eliminated
+    if (pPlayer->isEliminated) return;
     pPlayer->vy = -PLAYERSPEED;
 }
 
 void movePlayerDown(Player *pPlayer) {
+    // Don't move if player is eliminated
+    if (pPlayer->isEliminated) return;
     pPlayer->vy = PLAYERSPEED;
 } 
 
@@ -158,4 +174,17 @@ void revertToPreviousPosition(Player *pPlayer)
     pPlayer->y = pPlayer->prevY;
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
+}
+
+void eliminatePlayer(Player *pPlayer)
+{
+    pPlayer->isEliminated = true;
+    // Stop all movement
+    pPlayer->vx = 0;
+    pPlayer->vy = 0;
+}
+
+bool isPlayerEliminated(Player *pPlayer)
+{
+    return pPlayer->isEliminated;
 }

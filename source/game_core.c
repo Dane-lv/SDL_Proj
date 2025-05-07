@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <SDL.h>
+#include <SDL_ttf.h>
 #include <stdbool.h>
 #include <math.h>     
 #include <string.h>
@@ -10,6 +11,7 @@
 #include "../include/maze.h"
 #include "../include/projectile.h"
 #include "../include/network.h"
+#include "../include/audio_manager.h"
 
 #define UPDATE_RATE 10  // Send position updates every 10 frames
 
@@ -58,6 +60,31 @@ bool gameInit(GameContext *game) {
         if (!game->projectiles[i]) {
             printf("Error: Failed to create projectile %d\n", i);
             return false;
+        }
+    }
+    
+    // Initialize text renderer
+    game->textRenderer = createTextRenderer(game->renderer);
+    if (!game->textRenderer) {
+        printf("Error: Failed to create text renderer\n");
+        // Continue anyway - we'll just not render text
+    }
+    
+    // Initialize audio system
+    if (!audioInit(&game->audioManager)) {
+        printf("Warning: Failed to initialize audio system\n");
+        // Continue anyway - we'll just not have sound
+    } else {
+        // Load and play background music
+        if (loadBackgroundMusic(&game->audioManager, "resources/music/background music.mp3")) {
+            playBackgroundMusic(&game->audioManager);
+        } else {
+            printf("Warning: Failed to load background music\n");
+        }
+        
+        // Load game over sound
+        if (!loadGameOverSound(&game->audioManager, "resources/sfx/GameOver.mp3")) {
+            printf("Warning: Failed to load game over sound\n");
         }
     }
     
@@ -202,15 +229,19 @@ void handleInput(GameContext *game, SDL_Event *event) {
                 movePlayerRight(game->localPlayer);
                 break;
             case SDL_SCANCODE_SPACE:
-                spawnProjectile(game->projectiles, game->localPlayer);
-                
-                // Send shoot event over network
-                if (game->isNetworked && game->netMgr.localPlayerId != 0xFF) {
-                    SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
-                    float playerX = (float)(playerPos.x + playerPos.w/2);
-                    float playerY = (float)(playerPos.y + playerPos.h/2);
-                    float angle = getPlayerAngle(game->localPlayer);
-                    sendPlayerShoot(&game->netMgr, playerX, playerY, angle);
+                // Don't shoot if player is eliminated
+                if (!isPlayerEliminated(game->localPlayer)) {
+                    spawnProjectile(game->projectiles, game->localPlayer);
+                    
+                    // Send shoot event over network
+                    if (game->isNetworked && game->netMgr.localPlayerId != 0xFF) {
+                        // Instead of getting gun tip position, use player position and angle
+                        SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
+                        float playerX = (float)(playerPos.x + playerPos.w/2);
+                        float playerY = (float)(playerPos.y + playerPos.h/2);
+                        float angle = getPlayerAngle(game->localPlayer);
+                        sendPlayerShoot(&game->netMgr, playerX, playerY, angle);
+                    }
                 }
                 break;
             default:
@@ -237,7 +268,7 @@ void handleInput(GameContext *game, SDL_Event *event) {
 }
 
 void updateGame(GameContext *game, float deltaTime) {
-
+    // Update player position (this already has an internal check for isEliminated)
     updatePlayer(game->localPlayer, deltaTime);
     
     SDL_Rect playerRect = getPlayerRect(game->localPlayer);
@@ -248,20 +279,67 @@ void updateGame(GameContext *game, float deltaTime) {
     
     updateProjectileWithWallCollision(game->projectiles, game->maze, deltaTime);
     
+    // Check for projectile collisions with players
+    checkProjectilePlayerCollisions(game);
+    
+    // Update camera after final player position is determined
     updateCamera(game->camera, game->localPlayer);
 }
 
+// Check for collisions between projectiles and players
+void checkProjectilePlayerCollisions(GameContext *game) {
+    // Check each active projectile
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (isProjectileActive(game->projectiles[i])) {
+            SDL_Rect projRect = getProjectileRect(game->projectiles[i]);
+            
+            // Check collision with each player
+            for (int j = 0; j < MAX_PLAYERS; j++) {
+                if (game->players[j] != NULL && !isPlayerEliminated(game->players[j])) {
+                    SDL_Rect playerRect = getPlayerRect(game->players[j]);
+                    
+                    // Skip collision check for the first few frames after a projectile is spawned
+                    // to prevent self-elimination
+                    if (getProjectileAge(game->projectiles[i]) < 0.1f) {
+                        continue;
+                    }
+                    
+                    // Check if projectile intersects with player
+                    if (SDL_HasIntersection(&projRect, &playerRect)) {
+                        // Eliminate the player
+                        eliminatePlayer(game->players[j]);
+                        
+                        // Deactivate the projectile
+                        deactivateProjectile(game->projectiles[i]);
+                        
+                        // Play game over sound if local player is eliminated
+                        if (game->players[j] == game->localPlayer) {
+                            playGameOverSound(&game->audioManager);
+                        }
+                        
+                        // If this is a networked game, send elimination message
+                        if (game->isNetworked && game->netMgr.localPlayerId != 0xFF) {
+                            // If the eliminated player is local, inform others
+                            if (game->players[j] == game->localPlayer) {
+                                sendPlayerEliminated(&game->netMgr);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void updatePlayerRotation(GameContext *game) {
-  
+    // Get mouse position in screen coordinates
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
     
- 
     SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
     
     SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(game->camera, playerPos);
     
-   
     float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
     float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
     
@@ -276,28 +354,51 @@ void updatePlayerRotation(GameContext *game) {
 }
 
 void renderGame(GameContext *game) {
-  
     SDL_SetRenderDrawColor(game->renderer, 0, 0, 0, 255);
     SDL_RenderClear(game->renderer);
     
     drawMap(game->maze, game->camera, game->localPlayer);
     
-   
+    // Draw all players (only if not eliminated)
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (game->players[i] != NULL) {
+        if (game->players[i] != NULL && !isPlayerEliminated(game->players[i])) {
             drawPlayer(game->players[i], game->camera);
         }
     }
     
-   
     drawProjectile(game->projectiles, game->camera);
 
-   
+    // If local player is eliminated, render a semi-transparent black overlay with GAME OVER text
+    if (isPlayerEliminated(game->localPlayer)) {
+        // Set the renderer to 80% black
+        SDL_SetRenderDrawColor(game->renderer, 0, 0, 0, 204); // 80% opacity (204/255)
+        SDL_SetRenderDrawBlendMode(game->renderer, SDL_BLENDMODE_BLEND);
+        
+        // Create a rect covering the entire screen
+        SDL_Rect fullScreenRect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+        SDL_RenderFillRect(game->renderer, &fullScreenRect);
+        
+        // Render "GAME OVER" text using the text renderer
+        if (game->textRenderer) {
+            renderGameOverText(game->textRenderer, WINDOW_WIDTH, WINDOW_HEIGHT);
+        }
+        
+        // Reset blend mode
+        SDL_SetRenderDrawBlendMode(game->renderer, SDL_BLENDMODE_NONE);
+    }
+
+    // Present the rendered frame
     SDL_RenderPresent(game->renderer);
 }
 
 void gameCoreShutdown(GameContext *game) {
-  
+    // Clean up text renderer
+    if (game->textRenderer) {
+        destroyTextRenderer(game->textRenderer);
+        game->textRenderer = NULL;
+    }
+    
+    // Clean up projectiles
     destroyProjectile(game->projectiles);
 
     if (game->camera) {
@@ -322,6 +423,9 @@ void gameCoreShutdown(GameContext *game) {
         destroyMaze(game->maze);
         game->maze = NULL;
     }
+
+    // Clean up audio resources
+    audioCleanup(&game->audioManager);
 }
 
 void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const void *data, int size) {
@@ -375,6 +479,20 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             
             // Spawn projectile for remote player
             spawnProjectile(game->projectiles, game->players[playerId]);
+            break;
+        }
+        case MSG_ELIMINATED: {
+            // Handle player elimination
+            if (game->players[playerId] != NULL) {
+                eliminatePlayer(game->players[playerId]);
+                
+                // Play game over sound if local player is eliminated
+                if (playerId == game->netMgr.localPlayerId) {
+                    playGameOverSound(&game->audioManager);
+                }
+                
+                printf("Player %d has been eliminated!\n", playerId);
+            }
             break;
         }
         case MSG_LEAVE: {

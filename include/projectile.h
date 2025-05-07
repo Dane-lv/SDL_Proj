@@ -17,5 +17,7 @@ void updateProjectileWithWallCollision(Projectile *pProjectile[], Maze *pMaze, f
 void destroyProjectile(Projectile *pProjectile[]);
 SDL_Rect getProjectileRect(Projectile *pProjectile);
 bool isProjectileActive(Projectile *pProjectile);
+float getProjectileAge(Projectile *pProjectile);
+void deactivateProjectile(Projectile *pProjectile);
 
 #endif 

@@ -14,12 +14,24 @@
 
 int main(int argc, char **argv)
 {
-    (void)argc; (void)argv;              /* kommandorader ignoreras – menyn sköter valen  */
-
-    /* -------------------------------------------------- */
-    /* Init‑block                                         */
-    /* -------------------------------------------------- */
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+    char* joinIP = NULL;
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--join") == 0 && i + 1 < argc) {
+            joinIP = argv[i + 1];
+            i++; // Skip next argument (IP address)
+        }
+    }
+    
+    // If no IP was specified, use localhost
+    if (joinIP == NULL) {
+        joinIP = DEFAULT_IP;
+        printf("No IP specified, connecting to localhost\n");
+    }
+    
+    // Initialize SDL
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) != 0) {
         printf("SDL Initialization Error: %s\n", SDL_GetError());
         return 1;
     }
@@ -80,7 +92,7 @@ int main(int argc, char **argv)
         if (menuGetChoice(menu) != MENU_CHOICE_NONE)
             break;
 
-        SDL_Delay(16);  /* ~60 fps */
+        SDL_Delay(16);  /* ~60 fps */
     }
 
     /* Hantera menyresultat */
@@ -104,6 +116,11 @@ int main(int argc, char **argv)
     } else if (choice == MENU_CHOICE_JOIN) {
         strncpy(joinIpBuf, menuGetJoinIP(menu), sizeof(joinIpBuf) - 1);
         joinIpBuf[sizeof(joinIpBuf) - 1] = '\0';
+    } else if (joinIP != NULL) {
+        // Command line join overrides menu
+        strncpy(joinIpBuf, joinIP, sizeof(joinIpBuf) - 1);
+        joinIpBuf[sizeof(joinIpBuf) - 1] = '\0';
+        startAsHost = false;
     }
     menuDestroy(menu);
 
