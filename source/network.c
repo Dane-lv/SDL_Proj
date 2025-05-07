@@ -274,4 +274,41 @@ bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle) {
         bytesSent = SDLNet_TCP_Send(nm->client, nm->buf, offset);
         return bytesSent == offset;
     }
-} 
+}
+
+// Send player elimination message
+bool sendPlayerEliminated(NetMgr *nm) {
+    // Only allow if we're connected and have a valid player ID
+    if (!nm->client || nm->localPlayerId == 0xFF) return false;
+    
+    // Create message header
+    MessageHeader header = {
+        .type = MSG_ELIMINATED,
+        .playerId = nm->localPlayerId,
+        .size = 0  // No payload needed
+    };
+    
+    // Pack header
+    memcpy(nm->buf, &header, sizeof(MessageHeader));
+    
+    // Send the data
+    int bytesSent = 0;
+    
+    if (nm->isHost) {
+        // Host sends to all clients
+        for (int i = 0; i < nm->peerCount; i++) {
+            bytesSent = SDLNet_TCP_Send(nm->peers[i], nm->buf, sizeof(MessageHeader));
+            if (bytesSent < sizeof(MessageHeader)) {
+                printf("SDLNet_TCP_Send: %s\n", SDLNet_GetError());
+                return false;
+            }
+        }
+        // Also process locally
+        dispatchMessage(nm, MSG_ELIMINATED, nm->localPlayerId, NULL, 0);
+        return true;
+    } else {
+        // Client sends to host
+        bytesSent = SDLNet_TCP_Send(nm->client, nm->buf, sizeof(MessageHeader));
+        return bytesSent == sizeof(MessageHeader);
+    }
+}

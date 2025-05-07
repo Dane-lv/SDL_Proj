@@ -14,7 +14,8 @@ enum {
     MSG_POS,           // client → host: player position update
     MSG_SHOOT,         // client → host: projectile spawn
     MSG_STATE,         // host  → all: full game state
-    MSG_LEAVE          // client/host: disconnecting
+    MSG_LEAVE,         // client/host: disconnecting
+    MSG_ELIMINATED     // client → host: player is eliminated
 };
 
 // Message header structure (4 bytes)
@@ -50,5 +51,6 @@ void  clientTick(NetMgr *nm, void *ctx);
 // Send functions
 bool  sendPlayerPosition(NetMgr *nm, float x, float y, float angle);
 bool  sendPlayerShoot(NetMgr *nm, float x, float y, float angle);
+bool  sendPlayerEliminated(NetMgr *nm);
 
 #endif // NETWORK_H 

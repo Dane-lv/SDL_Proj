@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include <SDL.h>
+#include <stdbool.h>
 #include "camera.h"
 #include "constants.h"
 
@@ -28,5 +29,9 @@ float getPlayerAngle(Player *pPlayer);
 float getGunTipPosX(Player *pPlayer);
 float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
+
+// Add new functions for player elimination
+void eliminatePlayer(Player *pPlayer);
+bool isPlayerEliminated(Player *pPlayer);
 
 #endif 

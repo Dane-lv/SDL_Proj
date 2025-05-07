@@ -28,13 +28,13 @@ endif
 # Apply macOS settings (if detected)
 ifeq ($(MACOS),1)
     CFLAGS  += -I/opt/homebrew/include/SDL2
-    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
+    LDFLAGS += -L/opt/homebrew/lib -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net -lSDL2_mixer
 endif
 
 # Apply Linux settings (if detected)
 ifeq ($(LINUX),1)
     CFLAGS  += $(shell sdl2-config --cflags)
-    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_net
+    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_net -lSDL2_mixer
 endif
 
 # Windows SDL2 detection - first option (vcpkg)
@@ -42,7 +42,7 @@ ifeq ($(WINDOWS),1)
     ifneq ("$(wildcard C:/vcpkg/installed/x64-windows/include/SDL2)","")
         SDL2_FOUND = 1
         CFLAGS  += -IC:/vcpkg/installed/x64-windows/include -IC:/vcpkg/installed/x64-windows/include/SDL2
-        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
+        LDFLAGS += -LC:/vcpkg/installed/x64-windows/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net -lSDL2_mixer
     endif
 endif
 
@@ -52,7 +52,7 @@ ifeq ($(WINDOWS),1)
         ifneq ("$(wildcard C:/msys64/mingw64/include/SDL2)","")
             SDL2_FOUND = 1
             CFLAGS  += -IC:/msys64/mingw64/include -IC:/msys64/mingw64/include/SDL2
-            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net
+            LDFLAGS += -LC:/msys64/mingw64/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_net -lSDL2_mixer
         endif
     endif
 endif
@@ -65,7 +65,7 @@ ifeq ($(WINDOWS),1)
 endif
 
 SRCDIR   = source
-CORE_SOURCES = $(SRCDIR)/game_core.c $(SRCDIR)/maze.c $(SRCDIR)/player.c $(SRCDIR)/projectile.c $(SRCDIR)/network.c $(SRCDIR)/camera.c
+CORE_SOURCES = $(SRCDIR)/game_core.c $(SRCDIR)/maze.c $(SRCDIR)/player.c $(SRCDIR)/projectile.c $(SRCDIR)/network.c $(SRCDIR)/camera.c $(SRCDIR)/text_renderer.c $(SRCDIR)/audio_manager.c
 SERVER_SOURCES = $(SRCDIR)/server.c
 CLIENT_SOURCES = $(SRCDIR)/client.c
 

@@ -58,22 +58,21 @@ void spawnProjectile(Projectile *pProjectile[], Player *pPlayer)
             float playerCenterX = playerRect.x + playerRect.w / 2.0f;
             float playerCenterY = playerRect.y + playerRect.h / 2.0f;
             
+            // Get angle and convert to radians for positioning
+            float angle = getPlayerAngle(pPlayer);
+            float radians = angle * M_PI / 180.0f; 
             
-            pProjectile[i]->x = playerCenterX;
-            pProjectile[i]->y = playerCenterY;
-            
+            // Spawn projectile a bit away from player center to prevent self-collision
+            float spawnDistance = playerRect.w * 0.75f; // 75% of player width
+            pProjectile[i]->x = playerCenterX + cosf(radians) * spawnDistance;
+            pProjectile[i]->y = playerCenterY + sinf(radians) * spawnDistance;
             
             pProjectile[i]->projRect.x = (int)pProjectile[i]->x - pProjectile[i]->projRect.w / 2;
             pProjectile[i]->projRect.y = (int)pProjectile[i]->y - pProjectile[i]->projRect.h / 2;
             
-            
-            float angle = getPlayerAngle(pPlayer);
-            float radians = (angle) * M_PI / 180.0f; 
-            
-            
+            // Set velocity
             pProjectile[i]->vx = cosf(radians) * PROJSPEED;
             pProjectile[i]->vy = sinf(radians) * PROJSPEED;
-            
             
             pProjectile[i]->projDuration = 3.0f;  // 3 seconds duration
             
@@ -230,6 +229,17 @@ SDL_Rect getProjectileRect(Projectile *pProjectile)
 bool isProjectileActive(Projectile *pProjectile)
 {
     return pProjectile->isActive;
+}
+
+// Get the age of the projectile (how long it's been active)
+float getProjectileAge(Projectile *pProjectile)
+{
+    // Projectiles start with projDuration = 3.0f and count down
+    // So age = initial duration - current duration
+    if (!pProjectile->isActive) {
+        return 0.0f;
+    }
+    return 3.0f - pProjectile->projDuration;
 }
 
 void destroyProjectile(Projectile *pProjectile[])
