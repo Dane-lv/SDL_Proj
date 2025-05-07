@@ -1,98 +1,180 @@
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_net.h>
+#include <SDL_ttf.h>
 #include <stdbool.h>
 #include <string.h>
 #include "../include/constants.h"
 #include "../include/game_core.h"
 #include "../include/network.h"
+#include "../include/menu.h"
 
 #define DEFAULT_PORT 7777
-#define DEFAULT_IP "127.0.0.1"
+#define DEFAULT_IP   "127.0.0.1"
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    char* joinIP;
-    if (argc > 1) {
-        joinIP = argv[1];
-    } else {
-        joinIP = DEFAULT_IP;
-    }
+    (void)argc; (void)argv;              /* kommandorader ignoreras – menyn sköter valen  */
 
-
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        printf("Fel: Kunde inte initiera SDL: %s\n", SDL_GetError());
+    /* -------------------------------------------------- */
+    /* Init‑block                                         */
+    /* -------------------------------------------------- */
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+        printf("SDL Initialization Error: %s\n", SDL_GetError());
         return 1;
     }
-
+    if (TTF_Init() != 0) {
+        printf("TTF Initialization Error: %s\n", TTF_GetError());
+        SDL_Quit();
+        return 1;
+    }
     if (!netInit()) {
-        printf("Fel: Kunde inte initiera SDL_net: %s\n", SDLNet_GetError());
+        printf("Failed to initialize SDL_net: %s\n", SDLNet_GetError());
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
 
-    GameContext game = {0};
-    game.isHost = false;
-    game.isNetworked = true;
+    /* -------------------------------------------------- */
+    /* Skapa GameContext, fönster & renderer (behövs för menyn) */
+    /* -------------------------------------------------- */
+    NetMgr      nm  = {0};
+    GameContext ctx = {0};          /* blir både host & client beroende på menyval */
 
-    game.window = SDL_CreateWindow("Maze Mayhem - CLIENT",
-                                 SDL_WINDOWPOS_CENTERED,
-                                 SDL_WINDOWPOS_CENTERED,
-                                 WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-    if (!game.window) {
-        printf("Fel: Kunde inte skapa fönster: %s\n", SDL_GetError());
+    ctx.window = SDL_CreateWindow("Maze Mayhem",
+                                  SDL_WINDOWPOS_CENTERED,
+                                  SDL_WINDOWPOS_CENTERED,
+                                  WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    if (!ctx.window) {
+        printf("Window Creation Error: %s\n", SDL_GetError());
         netShutdown();
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
 
-    game.renderer = SDL_CreateRenderer(game.window, -1, SDL_RENDERER_ACCELERATED);
-    if (!game.renderer) {
-        printf("Fel: Kunde inte skapa renderare: %s\n", SDL_GetError());
-        SDL_DestroyWindow(game.window);
+    ctx.renderer = SDL_CreateRenderer(ctx.window, -1,
+                        SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
+    if (!ctx.renderer) {
+        printf("Renderer Creation Error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(ctx.window);
         netShutdown();
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
 
-    printf("Ansluter till server %s:%d...\n", joinIP, DEFAULT_PORT);
-    if (!clientConnect(&game.netMgr, joinIP, DEFAULT_PORT)) {
-        printf("Fel: Kunde inte ansluta till servern.\n");
-        SDL_DestroyRenderer(game.renderer);
-        SDL_DestroyWindow(game.window);
+    /* -------------------------------------------------- */
+    /* Huvudmeny                                          */
+    /* -------------------------------------------------- */
+    Menu *menu = menuCreate(ctx.renderer, ctx.window);
+
+    bool menuRunning = true;
+    while (menuRunning) {
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev)) {
+            menuRunning = menuHandleEvent(menu, &ev);
+        }
+        menuRender(menu);
+
+        if (menuGetChoice(menu) != MENU_CHOICE_NONE)
+            break;
+
+        SDL_Delay(16);  /* ~60 fps */
+    }
+
+    /* Hantera menyresultat */
+    MenuChoice choice = menuGetChoice(menu);
+    if (choice == MENU_CHOICE_QUIT || choice == MENU_CHOICE_NONE) {
+        /* Avsluta programmet */
+        menuDestroy(menu);
+        SDL_DestroyRenderer(ctx.renderer);
+        SDL_DestroyWindow(ctx.window);
         netShutdown();
+        TTF_Quit();
         SDL_Quit();
-        return 1;
+        return 0;
     }
-    printf("Ansluten!\n");
 
-    if (!gameInit(&game)) {
-        printf("Fel: Kunde inte initiera spelet.\n");
-        if (game.netMgr.client) SDLNet_TCP_Close(game.netMgr.client);
-        if (game.netMgr.set) SDLNet_FreeSocketSet(game.netMgr.set);
-        SDL_DestroyRenderer(game.renderer);
-        SDL_DestroyWindow(game.window);
+    char joinIpBuf[64] = DEFAULT_IP;
+    bool startAsHost   = false;
+
+    if (choice == MENU_CHOICE_HOST) {
+        startAsHost = true;
+    } else if (choice == MENU_CHOICE_JOIN) {
+        strncpy(joinIpBuf, menuGetJoinIP(menu), sizeof(joinIpBuf) - 1);
+        joinIpBuf[sizeof(joinIpBuf) - 1] = '\0';
+    }
+    menuDestroy(menu);
+
+    /* -------------------------------------------------- */
+    /* Nätverks‑setup                                     */
+    /* -------------------------------------------------- */
+    ctx.isHost      = startAsHost;
+    ctx.isNetworked = true;
+    ctx.netMgr      = nm;
+    ctx.netMgr.userData = &ctx;
+
+    bool netOk = false;
+    if (startAsHost) {
+        netOk = hostStart(&ctx.netMgr, DEFAULT_PORT);
+    } else {
+        netOk = clientConnect(&ctx.netMgr, joinIpBuf, DEFAULT_PORT);
+    }
+    if (!netOk) {
+        printf("Failed to %s: %s\n",
+               startAsHost ? "start host" : "connect to server",
+               SDLNet_GetError());
+        SDL_DestroyRenderer(ctx.renderer);
+        SDL_DestroyWindow(ctx.window);
         netShutdown();
+        TTF_Quit();
         SDL_Quit();
         return 1;
     }
 
-    // --- Main Game Loop ---
-    while (game.isRunning) {
-        gameCoreRunFrame(&game);
+    /* -------------------------------------------------- */
+    /* Initiera spel‑logiken                              */
+    /* -------------------------------------------------- */
+    if (!gameInit(&ctx)) {
+        printf("Failed to initialize game\n");
+        SDL_DestroyRenderer(ctx.renderer);
+        SDL_DestroyWindow(ctx.window);
+        netShutdown();
+        TTF_Quit();
+        SDL_Quit();
+        return 1;
     }
 
-   
-    gameCoreShutdown(&game); 
+    /* -------------------------------------------------- */
+    /* Huvud‑loop                                         */
+    /* -------------------------------------------------- */
+    while (ctx.isRunning) {
+        gameCoreRunFrame(&ctx);
+    }
 
-    if (game.netMgr.client) SDLNet_TCP_Close(game.netMgr.client);
-    if (game.netMgr.set) SDLNet_FreeSocketSet(game.netMgr.set);
+    /* -------------------------------------------------- */
+    /* Städning                                           */
+    /* -------------------------------------------------- */
+    gameCoreShutdown(&ctx);
 
-    if (game.renderer) SDL_DestroyRenderer(game.renderer);
-    if (game.window) SDL_DestroyWindow(game.window);
+    if (ctx.netMgr.client)
+        SDLNet_TCP_Close(ctx.netMgr.client);
+
+    if (ctx.netMgr.server) {
+        for (int i = 0; i < ctx.netMgr.peerCount; ++i)
+            if (ctx.netMgr.peers[i])
+                SDLNet_TCP_Close(ctx.netMgr.peers[i]);
+        SDLNet_TCP_Close(ctx.netMgr.server);
+    }
+    if (ctx.netMgr.set)
+        SDLNet_FreeSocketSet(ctx.netMgr.set);
+
+    if (ctx.renderer) SDL_DestroyRenderer(ctx.renderer);
+    if (ctx.window)   SDL_DestroyWindow(ctx.window);
 
     netShutdown();
+    TTF_Quit();
     SDL_Quit();
-
     return 0;
-} 
+}

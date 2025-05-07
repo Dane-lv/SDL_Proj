@@ -34,7 +34,7 @@ endif
 # Apply Linux settings (if detected)
 ifeq ($(LINUX),1)
     CFLAGS  += $(shell sdl2-config --cflags)
-    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_net
+    LDFLAGS += $(shell sdl2-config --libs) -lSDL2_ttf -lSDL2_image -lSDL2_net   # --- NEW ---
 endif
 
 # Windows SDL2 detection - first option (vcpkg)
@@ -65,7 +65,14 @@ ifeq ($(WINDOWS),1)
 endif
 
 SRCDIR   = source
-CORE_SOURCES = $(SRCDIR)/game_core.c $(SRCDIR)/maze.c $(SRCDIR)/player.c $(SRCDIR)/projectile.c $(SRCDIR)/network.c $(SRCDIR)/camera.c
+CORE_SOURCES = $(SRCDIR)/game_core.c \
+               $(SRCDIR)/maze.c \
+               $(SRCDIR)/player.c \
+               $(SRCDIR)/projectile.c \
+               $(SRCDIR)/network.c \
+               $(SRCDIR)/camera.c \
+               $(SRCDIR)/menu.c        # --- NEW ---
+
 SERVER_SOURCES = $(SRCDIR)/server.c
 CLIENT_SOURCES = $(SRCDIR)/client.c
 
