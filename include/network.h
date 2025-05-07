@@ -41,11 +41,11 @@ void  netShutdown(void);
 
 // Host functions
 bool  hostStart(NetMgr *nm, int port);
-void  hostTick(NetMgr *nm, void *ctx);
+void  hostTick(NetMgr *nm, void *game);
 
 // Client functions
 bool  clientConnect(NetMgr *nm, const char *ip, int port);
-void  clientTick(NetMgr *nm, void *ctx);
+void  clientTick(NetMgr *nm, void *game);
 
 // Send functions
 bool  sendPlayerPosition(NetMgr *nm, float x, float y, float angle);

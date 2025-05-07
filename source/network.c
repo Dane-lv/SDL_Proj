@@ -3,25 +3,25 @@
 #include <string.h>
 #include <stdio.h>
 
-// Vidarebefordrar nätverksmeddelanden till spelmotorn
+// nätverksmeddelanden till spelet
 static void dispatchMessage(NetMgr *nm, Uint8 type, Uint8 playerId, const void *data, int size) {
     if (nm->userData) {
-        GameContext *ctx = (GameContext*)nm->userData;
-        gameOnNetworkMessage(ctx, type, playerId, data, size);
+        GameContext *game = (GameContext*)nm->userData;
+        gameOnNetworkMessage(game, type, playerId, data, size);
     }
 }
 
-// Initierar SDL_net
+
 bool netInit(void) {
     return SDLNet_Init() == 0;
 }
 
-// Stänger ner SDL_net
+
 void netShutdown(void) {
     SDLNet_Quit();
 }
 
-// Startar en värddator som lyssnar efter anslutningar
+
 bool hostStart(NetMgr *nm, int port) {
     IPaddress ip;
     
@@ -31,14 +31,14 @@ bool hostStart(NetMgr *nm, int port) {
         return false;
     }
     
-    // Skapa socket-uppsättning för att hantera anslutningar
+    // Skapa socket
     nm->set = SDLNet_AllocSocketSet(MAX_PLAYERS + 1);
     if (!nm->set) {
         printf("SDLNet_AllocSocketSet: %s\n", SDLNet_GetError());
         return false;
     }
     
-    // Skapa server-socket
+    // Skapa server socket
     nm->server = SDLNet_TCP_Open(&ip);
     if (!nm->server) {
         printf("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
@@ -46,21 +46,21 @@ bool hostStart(NetMgr *nm, int port) {
         return false;
     }
     
-    // Lägg till server-socket i uppsättningen
+
     SDLNet_TCP_AddSocket(nm->set, nm->server);
     
     // Initiera anslutningsräknare och spelar-ID
     nm->peerCount = 0;
     nm->isHost = true;
-    nm->localPlayerId = 0;  // Värden är alltid spelare 0
+    nm->localPlayerId = 0;  // Host är alltid spelare 0
     
     printf("Värddator startad på port %d\n", port);
     return true;
 }
 
-// Uppdaterar värddatorn (anropas varje bildruta)
-void hostTick(NetMgr *nm, void *ctx) {
-    nm->userData = ctx;
+
+void hostTick(NetMgr *nm, void *game) {
+    nm->userData = game;
     
     // Kontrollera om någon socket har data att läsa
     int ready = SDLNet_CheckSockets(nm->set, 0);
@@ -149,7 +149,7 @@ bool clientConnect(NetMgr *nm, const char *ip, int port) {
         return false;
     }
     
-    // Skapa socket-uppsättning för att övervaka anslutningen
+    // övervaka anslutningen
     nm->set = SDLNet_AllocSocketSet(1);
     if (!nm->set) {
         printf("SDLNet_AllocSocketSet: %s\n", SDLNet_GetError());
@@ -169,8 +169,8 @@ bool clientConnect(NetMgr *nm, const char *ip, int port) {
 }
 
 // Uppdaterar klienten (anropas varje bildruta)
-void clientTick(NetMgr *nm, void *ctx) {
-    nm->userData = ctx;
+void clientTick(NetMgr *nm, void *game) {
+    nm->userData = game;
     
     // Kontrollera om socketen har data att läsa
     int ready = SDLNet_CheckSockets(nm->set, 0);
