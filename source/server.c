@@ -29,86 +29,86 @@ int main(int argc, char** argv)
     
     // Create game context
     NetMgr nm = {0};
-    GameContext ctx = {0};
+    GameContext game = {0};
     
     // Set up context
-    ctx.isHost = true;
-    ctx.isNetworked = true;
-    ctx.netMgr = nm;
-    ctx.netMgr.userData = &ctx;
+    game.isHost = true;
+    game.isNetworked = true;
+    game.netMgr = nm;
+    game.netMgr.userData = &game;
     
     // Create window and renderer
-    ctx.window = SDL_CreateWindow("Maze Mayhem - SERVER", 
+    game.window = SDL_CreateWindow("Maze Mayhem - SERVER", 
                                  SDL_WINDOWPOS_CENTERED,
                                  SDL_WINDOWPOS_CENTERED,
                                  WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-    if (!ctx.window) {
+    if (!game.window) {
         printf("Window Creation Error: %s\n", SDL_GetError());
         netShutdown();
         SDL_Quit();
         return 1;
     }
     
-    ctx.renderer = SDL_CreateRenderer(ctx.window, -1, 
+    game.renderer = SDL_CreateRenderer(game.window, -1, 
                                     SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
-    if (!ctx.renderer) {
+    if (!game.renderer) {
         printf("Renderer Creation Error: %s\n", SDL_GetError());
-        SDL_DestroyWindow(ctx.window);
+        SDL_DestroyWindow(game.window);
         netShutdown();
         SDL_Quit();
         return 1;
     }
     
     // Start host on default port
-    if (!hostStart(&ctx.netMgr, DEFAULT_PORT)) {
+    if (!hostStart(&game.netMgr, DEFAULT_PORT)) {
         printf("Failed to start host: %s\n", SDLNet_GetError());
-        SDL_DestroyRenderer(ctx.renderer);
-        SDL_DestroyWindow(ctx.window);
+        SDL_DestroyRenderer(game.renderer);
+        SDL_DestroyWindow(game.window);
         netShutdown();
         SDL_Quit();
         return 1;
     }
     
     // Initialize game
-    if (!gameInit(&ctx)) {
+    if (!gameInit(&game)) {
         printf("Failed to initialize game\n");
-        SDL_DestroyRenderer(ctx.renderer);
-        SDL_DestroyWindow(ctx.window);
+        SDL_DestroyRenderer(game.renderer);
+        SDL_DestroyWindow(game.window);
         netShutdown();
         SDL_Quit();
         return 1;
     }
     
     // Main game loop
-    while (ctx.isRunning) {
-        gameCoreRunFrame(&ctx);
+    while (game.isRunning) {
+        gameCoreRunFrame(&game);
     }
     
     // Cleanup
-    gameCoreShutdown(&ctx);
+    gameCoreShutdown(&game);
     
     // Clean up network resources
-    if (ctx.netMgr.server) {
+    if (game.netMgr.server) {
         // Close all client connections
-        for (int i = 0; i < ctx.netMgr.peerCount; i++) {
-            if (ctx.netMgr.peers[i]) {
-                SDLNet_TCP_Close(ctx.netMgr.peers[i]);
+        for (int i = 0; i < game.netMgr.peerCount; i++) {
+            if (game.netMgr.peers[i]) {
+                SDLNet_TCP_Close(game.netMgr.peers[i]);
             }
         }
-        SDLNet_TCP_Close(ctx.netMgr.server);
+        SDLNet_TCP_Close(game.netMgr.server);
     }
     
-    if (ctx.netMgr.set) {
-        SDLNet_FreeSocketSet(ctx.netMgr.set);
+    if (game.netMgr.set) {
+        SDLNet_FreeSocketSet(game.netMgr.set);
     }
     
     // Clean up renderer and window
-    if (ctx.renderer) {
-        SDL_DestroyRenderer(ctx.renderer);
+    if (game.renderer) {
+        SDL_DestroyRenderer(game.renderer);
     }
     
-    if (ctx.window) {
-        SDL_DestroyWindow(ctx.window);
+    if (game.window) {
+        SDL_DestroyWindow(game.window);
     }
     
     netShutdown();

@@ -6,7 +6,7 @@
 #include <stdbool.h>
 
 #define MAX_PLAYERS 5      // total slots
-#define BUF_SIZE    1024   // header + payload
+#define BUF_SIZE    1024   
 
 // Message types
 enum {
@@ -41,11 +41,11 @@ void  netShutdown(void);
 
 // Host functions
 bool  hostStart(NetMgr *nm, int port);
-void  hostTick(NetMgr *nm, void *ctx);
+void  hostTick(NetMgr *nm, void *game);
 
 // Client functions
 bool  clientConnect(NetMgr *nm, const char *ip, int port);
-void  clientTick(NetMgr *nm, void *ctx);
+void  clientTick(NetMgr *nm, void *game);
 
 // Send functions
 bool  sendPlayerPosition(NetMgr *nm, float x, float y, float angle);
