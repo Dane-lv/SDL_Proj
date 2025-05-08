@@ -29,4 +29,6 @@ float getGunTipPosX(Player *pPlayer);
 float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
 
+void playerSetTextureById(Player *pPlayer, SDL_Renderer *pRenderer, int playerId);
+
 #endif 

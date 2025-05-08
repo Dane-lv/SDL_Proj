@@ -32,6 +32,10 @@ bool gameInit(GameContext *game) {
         printf("Error creating player: %s\n", SDL_GetError());
         return false;
     }
+    // For host, set texture for player ID 0 immediately
+    if (game->isHost) {
+        playerSetTextureById(game->localPlayer, game->renderer, 0);
+    }
     
     // Store local player in player array (will be updated when ID is assigned)
     game->players[0] = game->localPlayer;
@@ -147,6 +151,8 @@ void gameCoreRunFrame(GameContext *game) {
 
                 setPlayerPosition(game->localPlayer, startX, startY);
                 initialPosSet = true;
+                // Set texture for the local client player now that ID is known
+                playerSetTextureById(game->localPlayer, game->renderer, id);
                 
                 // Update our local player index in the players array
                 if (game->players[0] == game->localPlayer) {
@@ -349,6 +355,8 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             if (game->players[playerId] == NULL && playerId != game->netMgr.localPlayerId) {
                 game->players[playerId] = createPlayer(game->renderer);
                 if (!game->players[playerId]) return;
+                // Set texture for the newly created remote player
+                playerSetTextureById(game->players[playerId], game->renderer, playerId);
                 
                 // positions  of players
                 setPlayerPosition(game->players[playerId], x, y);

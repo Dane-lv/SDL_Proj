@@ -3,6 +3,7 @@
 
 #define WINDOW_WIDTH  800
 #define WINDOW_HEIGHT 600
+#define MAX_PLAYERS    5      // Max antal spelare (0-4)
 #define PLAYERWIDTH 30
 #define PLAYERHEIGHT 45
 #define PLAYERSPEED 200
