@@ -239,12 +239,12 @@ bool sendPlayerPosition(NetMgr *nm, float x, float y, float angle) {
 }
 
 // Skickar spelarens skotthändelse till nätverket
-bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle) {
+bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle, int projectileId) {
     // Skapa meddelandehuvud
     MessageHeader header = {
         .type = MSG_SHOOT,
         .playerId = nm->localPlayerId,
-        .size = sizeof(float) * 3
+        .size = sizeof(float) * 3 + sizeof(int)  // Added space for projectileId
     };
     
     // Kopiera huvud och skottdata till bufferten
@@ -255,7 +255,11 @@ bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle) {
     shootData[1] = y;
     shootData[2] = angle;
     
-    int totalSize = sizeof(MessageHeader) + sizeof(float) * 3;
+    // Add projectile ID after the float data
+    int* idPtr = (int*)(nm->buf + sizeof(MessageHeader) + sizeof(float) * 3);
+    *idPtr = projectileId;
+    
+    int totalSize = sizeof(MessageHeader) + sizeof(float) * 3 + sizeof(int);
     
     // Skicka data baserat på om det är värd eller klient
     if (nm->isHost) {
@@ -270,6 +274,41 @@ bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle) {
         return true;
     } else {
         // Klienten skickar bara till värden
+        return SDLNet_TCP_Send(nm->client, nm->buf, totalSize) == totalSize;
+    }
+}
+
+// Sends player death notification to the network
+bool sendPlayerDeath(NetMgr *nm, Uint8 killedByPlayerId) {
+    // Create message header
+    MessageHeader header = {
+        .type = MSG_DEATH,
+        .playerId = nm->localPlayerId,
+        .size = sizeof(Uint8)  // Size of killedByPlayerId
+    };
+    
+    // Copy header and death data to buffer
+    memcpy(nm->buf, &header, sizeof(MessageHeader));
+    
+    // Set the killed-by player ID in the buffer
+    Uint8* deathData = (Uint8*)(nm->buf + sizeof(MessageHeader));
+    *deathData = killedByPlayerId;
+    
+    int totalSize = sizeof(MessageHeader) + sizeof(Uint8);
+    
+    // Send data based on whether it's host or client
+    if (nm->isHost) {
+        // Host sends to all clients
+        for (int i = 0; i < nm->peerCount; i++) {
+            if (SDLNet_TCP_Send(nm->peers[i], nm->buf, totalSize) < totalSize) {
+                return false;
+            }
+        }
+        // Process locally as well
+        dispatchMessage(nm, MSG_DEATH, nm->localPlayerId, deathData, header.size);
+        return true;
+    } else {
+        // Client only sends to host
         return SDLNet_TCP_Send(nm->client, nm->buf, totalSize) == totalSize;
     }
 }

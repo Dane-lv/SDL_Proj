@@ -24,6 +24,12 @@ typedef struct {
     bool isHost;
     bool isNetworked;
     int frameCounter;
+    
+    // New fields for death screen and spectate mode
+    bool isSpectating;
+    bool showDeathScreen;
+    SDL_Texture *fontTexture;
+    SDL_Rect spectateButtonRect;
 } GameContext;
 
 // Core game functions
@@ -34,6 +40,11 @@ void handleInput(GameContext *ctx, SDL_Event *event);
 void updateGame(GameContext *ctx, float deltaTime);
 void updatePlayerRotation(GameContext *ctx);
 void renderGame(GameContext *ctx);
+
+// New functions for death screen and spectate mode
+void checkPlayerProjectileCollisions(GameContext *ctx);
+void renderDeathScreen(GameContext *ctx);
+void enableSpectateMode(GameContext *ctx);
 
 // Network event handling
 void gameOnNetworkMessage(GameContext *ctx, Uint8 type, Uint8 playerId, const void *data, int size);

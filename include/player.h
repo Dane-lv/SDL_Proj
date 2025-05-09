@@ -29,4 +29,9 @@ float getGunTipPosX(Player *pPlayer);
 float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
 
+// New functions for player elimination
+bool isPlayerAlive(Player *pPlayer);
+void killPlayer(Player *pPlayer);
+void resetPlayer(Player *pPlayer);
+
 #endif 

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <SDL.h>
+#include <SDL_ttf.h>
 #include <stdbool.h>
 #include <math.h>     
 #include <string.h>
@@ -12,6 +13,13 @@
 #include "../include/network.h"
 
 #define UPDATE_RATE 10  // Send position updates every 10 frames
+
+// Function declarations
+static void setWindowTitle(GameContext *game, const char *title);
+void initDeathScreen(GameContext *game);
+void renderDeathScreen(GameContext *game);
+void enableSpectateMode(GameContext *game);
+void checkPlayerProjectileCollisions(GameContext *game);
 
 // Helper function to set window title with connection info
 static void setWindowTitle(GameContext *game, const char *title) {
@@ -60,6 +68,27 @@ bool gameInit(GameContext *game) {
             return false;
         }
     }
+    
+    // Initialize death screen and spectate mode
+    game->isSpectating = false;
+    game->showDeathScreen = false;
+    
+    // Create "YOU DIED" text texture
+    SDL_Surface *textSurface = TTF_RenderText_Blended(
+        TTF_OpenFont("resources/font.ttf", 64),
+        "YOU DIED",
+        (SDL_Color){255, 0, 0, 255} // Red
+    );
+    if (textSurface) {
+        game->fontTexture = SDL_CreateTextureFromSurface(game->renderer, textSurface);
+        SDL_FreeSurface(textSurface);
+    } else {
+        game->fontTexture = NULL;
+        printf("Warning: Failed to create font texture\n");
+    }
+    
+    // Initialize spectate button rectangle
+    initDeathScreen(game);
     
     // Set window title based on connection type
     if (game->isNetworked) {
@@ -180,6 +209,25 @@ void gameCoreRunFrame(GameContext *game) {
 }
 
 void handleInput(GameContext *game, SDL_Event *event) {
+    // Death screen interaction
+    if (!isPlayerAlive(game->localPlayer) && game->showDeathScreen) {
+        if (event->type == SDL_MOUSEBUTTONDOWN) {
+            int mouseX, mouseY;
+            SDL_GetMouseState(&mouseX, &mouseY);
+            
+            // Check if spectate button was clicked
+            if (mouseX >= game->spectateButtonRect.x && 
+                mouseX <= game->spectateButtonRect.x + game->spectateButtonRect.w &&
+                mouseY >= game->spectateButtonRect.y && 
+                mouseY <= game->spectateButtonRect.y + game->spectateButtonRect.h) {
+                
+                // Enable spectate mode
+                enableSpectateMode(game);
+            }
+        }
+        return; // Don't process other input while on death screen
+    }
+    
     if (event->type == SDL_KEYDOWN) {
         switch (event->key.keysym.scancode) {
             case SDL_SCANCODE_ESCAPE:
@@ -202,53 +250,84 @@ void handleInput(GameContext *game, SDL_Event *event) {
                 movePlayerRight(game->localPlayer);
                 break;
             case SDL_SCANCODE_SPACE:
-                spawnProjectile(game->projectiles, game->localPlayer);
-                
-                // Send shoot event over network
-                if (game->isNetworked && game->netMgr.localPlayerId != 0xFF) {
-                    SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
-                    float playerX = (float)(playerPos.x + playerPos.w/2);
-                    float playerY = (float)(playerPos.y + playerPos.h/2);
-                    float angle = getPlayerAngle(game->localPlayer);
-                    sendPlayerShoot(&game->netMgr, playerX, playerY, angle);
+                // Only allow shooting if player is alive
+                if (isPlayerAlive(game->localPlayer)) {
+                    // Spawn the projectile and get its ID
+                    int projectileId = spawnProjectile(game->projectiles, game->localPlayer);
+                    
+                    // If projectile was spawned successfully
+                    if (projectileId >= 0 && game->isNetworked) {
+                        SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
+                        float angle = getPlayerAngle(game->localPlayer);
+                        float x = playerPos.x + playerPos.w / 2.0f;
+                        float y = playerPos.y + playerPos.h / 2.0f;
+                        
+                        // Factor in angle to place projectile outside the player
+                        float radians = angle * M_PI / 180.0f;
+                        float offsetDistance = 5.0f; // Minimal offset, matching spawn function
+                        x += cosf(radians) * offsetDistance;
+                        y += sinf(radians) * offsetDistance;
+                        
+                        // Send projectile data with projectile ID
+                        sendPlayerShoot(&game->netMgr, x, y, angle, projectileId);
+                        
+                        // Also send a position update immediately after shooting
+                        // This ensures spectators can still see the player
+                        sendPlayerPosition(&game->netMgr, (float)playerPos.x, (float)playerPos.y, angle);
+                    }
                 }
-                break;
-            default:
                 break;
         }
     } else if (event->type == SDL_KEYUP) {
         switch (event->key.keysym.scancode) {
             case SDL_SCANCODE_W:
-            case SDL_SCANCODE_S:
             case SDL_SCANCODE_UP:
+            case SDL_SCANCODE_S:
             case SDL_SCANCODE_DOWN:
                 stopMovementVY(game->localPlayer);
                 break;
             case SDL_SCANCODE_A:
-            case SDL_SCANCODE_D:
             case SDL_SCANCODE_LEFT:
+            case SDL_SCANCODE_D:
             case SDL_SCANCODE_RIGHT:
                 stopMovementVX(game->localPlayer);
-                break;
-            default:
                 break;
         }
     }
 }
 
 void updateGame(GameContext *game, float deltaTime) {
-
+    // Update local player
     updatePlayer(game->localPlayer, deltaTime);
     
-    SDL_Rect playerRect = getPlayerRect(game->localPlayer);
-    bool collision = checkCollision(game->maze, playerRect);
-    if (collision) {
+    // Prevent player from leaving the world boundaries
+    SDL_Rect playerRect = getPlayerPosition(game->localPlayer);
+    if (playerRect.x < 0 || playerRect.x + playerRect.w > WORLD_WIDTH ||
+        playerRect.y < 0 || playerRect.y + playerRect.h > WORLD_HEIGHT) {
         revertToPreviousPosition(game->localPlayer);
     }
     
+    // Check for wall collisions
+    if (checkCollision(game->maze, playerRect)) {
+        revertToPreviousPosition(game->localPlayer);
+    }
+    
+    // Update projectiles with wall collision
     updateProjectileWithWallCollision(game->projectiles, game->maze, deltaTime);
     
-    updateCamera(game->camera, game->localPlayer);
+    // Check for projectile-player collisions
+    checkPlayerProjectileCollisions(game);
+    
+    // Update camera based on spectate mode
+    if (game->isSpectating) {
+        // In spectate mode, keep the camera centered on the maze
+        float mazeCenterX = (TILE_WIDTH * TILE_SIZE) / 2.0f;
+        float mazeCenterY = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
+        setCameraPosition(game->camera, mazeCenterX, mazeCenterY);
+    } else {
+        // Normal camera following player
+        updateCamera(game->camera, game->localPlayer);
+    }
 }
 
 void updatePlayerRotation(GameContext *game) {
@@ -276,51 +355,57 @@ void updatePlayerRotation(GameContext *game) {
 }
 
 void renderGame(GameContext *game) {
-  
-    SDL_SetRenderDrawColor(game->renderer, 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(game->renderer, 10, 10, 10, 255);
     SDL_RenderClear(game->renderer);
     
-    drawMap(game->maze, game->camera, game->localPlayer);
+    // Render the maze walls (pass spectate mode flag)
+    drawMap(game->maze, game->camera, game->localPlayer, game->isSpectating);
     
-   
+    // Render all players and projectiles
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (game->players[i] != NULL) {
+        if (game->players[i]) {
             drawPlayer(game->players[i], game->camera);
         }
     }
     
-   
+    // Draw projectiles
     drawProjectile(game->projectiles, game->camera);
-
-   
+    
+    // Render death screen if player is dead and not in spectate mode
+    if (!isPlayerAlive(game->localPlayer) && game->showDeathScreen) {
+        renderDeathScreen(game);
+    }
+    
     SDL_RenderPresent(game->renderer);
 }
 
 void gameCoreShutdown(GameContext *game) {
-  
-    destroyProjectile(game->projectiles);
-
-    if (game->camera) {
-        destroyCamera(game->camera);
-        game->camera = NULL;
+    // Clean up network resources if networked game
+    if (game->isNetworked) {
+        netShutdown();
     }
-
-    // Clean up all players (except local player which is handled separately)
+    
+    // Destroy all projectiles
+    destroyProjectile(game->projectiles);
+    
+    // Destroy local player
+    destroyPlayer(game->localPlayer);
+    
+    // Destroy other players (in networked games)
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (game->players[i] && game->players[i] != game->localPlayer) {
             destroyPlayer(game->players[i]);
-            game->players[i] = NULL;
         }
     }
-
-    if (game->localPlayer) {
-        destroyPlayer(game->localPlayer);
-        game->localPlayer = NULL;
-    }
-
-    if (game->maze) {
-        destroyMaze(game->maze);
-        game->maze = NULL;
+    
+    // Destroy maze, camera and font texture
+    destroyMaze(game->maze);
+    destroyCamera(game->camera);
+    
+    // Destroy font texture
+    if (game->fontTexture) {
+        SDL_DestroyTexture(game->fontTexture);
+        game->fontTexture = NULL;
     }
 }
 
@@ -366,15 +451,40 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             break;
         }
         case MSG_SHOOT: {
-            if (size < 3.0 * sizeof(float)) return;
+            if (size < 3.0 * sizeof(float) + sizeof(int)) return;
 
             if (playerId == game->netMgr.localPlayerId) return;
             
             // Ensure remote player exists
             if (game->players[playerId] == NULL) return;
             
-            // Spawn projectile for remote player
-            spawnProjectile(game->projectiles, game->players[playerId]);
+            // Get projectile ID - properly cast data pointer to access int
+            const float* posData = (const float*)data;
+            int projectileId = *((const int*)(posData + 3));
+            
+            // Check if projectile ID is valid
+            if (projectileId < 0 || projectileId >= MAX_PROJECTILES) return;
+            
+            // Get position and angle data
+            float x = posData[0];
+            float y = posData[1];
+            float angle = posData[2];
+            
+            // Convert angle to radians
+            float radians = angle * M_PI / 180.0f;
+            
+            // Set projectile properties using accessor functions
+            setProjectileActive(game->projectiles[projectileId], true);
+            setProjectileOwner(game->projectiles[projectileId], game->players[playerId]);
+            setProjectilePosition(game->projectiles[projectileId], x, y);
+            setProjectileVelocity(
+                game->projectiles[projectileId], 
+                cosf(radians) * PROJSPEED, 
+                sinf(radians) * PROJSPEED
+            );
+            setProjectileDuration(game->projectiles[projectileId], 3.0f);  // 3 seconds duration
+            
+            printf("Received projectile %d from player %d\n", projectileId, playerId);
             break;
         }
         case MSG_LEAVE: {
@@ -385,5 +495,142 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             }
             break;
         }
+        case MSG_DEATH: {
+            if (size < sizeof(Uint8)) return;
+            
+            // Get the player who died
+            Player* deadPlayer = game->players[playerId];
+            if (!deadPlayer) return;
+            
+            // Only show death screen if it's the local player
+            if (deadPlayer == game->localPlayer) {
+                game->showDeathScreen = true;
+            }
+            
+            // Kill the player
+            killPlayer(deadPlayer);
+            
+            printf("Player %d has died\n", playerId);
+            break;
+        }
     }
+}
+
+// Check for collisions between projectiles and players
+void checkPlayerProjectileCollisions(GameContext *game) {
+    // For each projectile, check collision with all players
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (game->projectiles[i] && isProjectileActive(game->projectiles[i])) {
+            
+            // Check collision with the local player
+            if (isPlayerAlive(game->localPlayer) && 
+                checkProjectilePlayerCollision(game->projectiles[i], game->localPlayer)) {
+                // Kill player
+                killPlayer(game->localPlayer);
+                // Deactivate projectile
+                deactivateProjectile(game->projectiles[i]);
+                // Show death screen
+                game->showDeathScreen = true;
+                
+                // Send death message if networked game
+                if (game->isNetworked) {
+                    // Get the player ID who killed this player
+                    Player* killerPlayer = getProjectileOwner(game->projectiles[i]);
+                    Uint8 killerPlayerId = 0xFF; // Default to invalid ID
+                    
+                    // Find the player ID of the killer
+                    for (int j = 0; j < MAX_PLAYERS; j++) {
+                        if (game->players[j] == killerPlayer) {
+                            killerPlayerId = j;
+                            break;
+                        }
+                    }
+                    
+                    // Send death notification
+                    sendPlayerDeath(&game->netMgr, killerPlayerId);
+                }
+            }
+            
+            // Check collision with other players in networked games
+            if (game->isNetworked) {
+                for (int j = 0; j < MAX_PLAYERS; j++) {
+                    if (game->players[j] && game->players[j] != game->localPlayer && 
+                        isPlayerAlive(game->players[j]) && 
+                        checkProjectilePlayerCollision(game->projectiles[i], game->players[j])) {
+                        // Kill the player
+                        killPlayer(game->players[j]);
+                        // Deactivate projectile
+                        deactivateProjectile(game->projectiles[i]);
+                        
+                        // We don't show death screen for other players
+                        // We also don't need to send network messages for remote player collisions 
+                        // as those will be handled by the player's own client
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Initialize the death screen
+void initDeathScreen(GameContext *game) {
+    int buttonWidth = 200;
+    int buttonHeight = 50;
+    
+    // Center the spectate button on screen
+    game->spectateButtonRect.x = (WINDOW_WIDTH / 2) - (buttonWidth / 2);
+    game->spectateButtonRect.y = (WINDOW_HEIGHT / 2) + 50; // Position below "YOU DIED" text
+    game->spectateButtonRect.w = buttonWidth;
+    game->spectateButtonRect.h = buttonHeight;
+}
+
+// Render the death screen
+void renderDeathScreen(GameContext *game) {
+    SDL_Renderer *renderer = game->renderer;
+    
+    // Draw semi-transparent black overlay
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180); // Semi-transparent black
+    SDL_Rect fullScreen = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+    SDL_RenderFillRect(renderer, &fullScreen);
+    
+    // Draw "YOU DIED" text
+    if (game->fontTexture) {
+        SDL_Rect textRect = {
+            (WINDOW_WIDTH / 2) - 150, // Center horizontally
+            (WINDOW_HEIGHT / 2) - 50, // Position at center
+            300, // Width of text
+            80   // Height of text
+        };
+        
+        // Set text to be tinted red
+        SDL_SetTextureColorMod(game->fontTexture, 255, 0, 0);
+        SDL_RenderCopy(renderer, game->fontTexture, NULL, &textRect);
+    }
+    
+    // Draw spectate button
+    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); // Gray button
+    SDL_RenderFillRect(renderer, &game->spectateButtonRect);
+    
+    // Draw button border
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); // Light gray border
+    SDL_RenderDrawRect(renderer, &game->spectateButtonRect);
+    
+    // TODO: In a real implementation, we would draw the "Spectate" text on the button
+    // using proper font rendering
+}
+
+// Enable spectate mode
+void enableSpectateMode(GameContext *game) {
+    game->isSpectating = true;
+    game->showDeathScreen = false;
+    
+    // Set camera to spectate mode
+    setCameraSpectateMode(game->camera, true);
+    
+    // Center camera on the maze (not the world)
+    // Calculate maze center: (TILE_WIDTH * TILE_SIZE / 2, TILE_HEIGHT * TILE_SIZE / 2)
+    float mazeCenterX = (TILE_WIDTH * TILE_SIZE) / 2.0f;
+    float mazeCenterY = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
+    setCameraPosition(game->camera, mazeCenterX, mazeCenterY);
 } 
