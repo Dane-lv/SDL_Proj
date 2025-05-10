@@ -9,7 +9,7 @@
 #define WORLD_WIDTH 1600
 #define WORLD_HEIGHT 1200
 #define CAMERA_ZOOM 1.5
-#define SPECTATE_ZOOM 0.5
+#define SPECTATE_ZOOM 0.6
 #define TILE_WIDTH 30
 #define TILE_HEIGHT 25
 #define TILE_SIZE 32   

@@ -484,7 +484,6 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             );
             setProjectileDuration(game->projectiles[projectileId], 3.0f);  // 3 seconds duration
             
-            printf("Received projectile %d from player %d\n", projectileId, playerId);
             break;
         }
         case MSG_LEAVE: {
@@ -616,8 +615,28 @@ void renderDeathScreen(GameContext *game) {
     SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); // Light gray border
     SDL_RenderDrawRect(renderer, &game->spectateButtonRect);
     
-    // TODO: In a real implementation, we would draw the "Spectate" text on the button
-    // using proper font rendering
+    // Render "SPECTATE" text on the button
+    TTF_Font* buttonFont = TTF_OpenFont("resources/font.ttf", 28);
+    if (buttonFont) {
+        SDL_Color textColor = {255, 255, 255, 255}; // White text
+        SDL_Surface* buttonTextSurface = TTF_RenderText_Blended(buttonFont, "SPECTATE", textColor);
+        if (buttonTextSurface) {
+            SDL_Texture* buttonTextTexture = SDL_CreateTextureFromSurface(renderer, buttonTextSurface);
+            if (buttonTextTexture) {
+                // Center the text on the button
+                SDL_Rect buttonTextRect = {
+                    game->spectateButtonRect.x + (game->spectateButtonRect.w - buttonTextSurface->w) / 2,
+                    game->spectateButtonRect.y + (game->spectateButtonRect.h - buttonTextSurface->h) / 2,
+                    buttonTextSurface->w,
+                    buttonTextSurface->h
+                };
+                SDL_RenderCopy(renderer, buttonTextTexture, NULL, &buttonTextRect);
+                SDL_DestroyTexture(buttonTextTexture);
+            }
+            SDL_FreeSurface(buttonTextSurface);
+        }
+        TTF_CloseFont(buttonFont);
+    }
 }
 
 // Enable spectate mode

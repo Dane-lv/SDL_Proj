@@ -321,6 +321,11 @@ void deactivateProjectile(Projectile *pProjectile) {
 // New functions for network synchronization
 void setProjectileActive(Projectile *pProjectile, bool active) {
     pProjectile->isActive = active;
+    if (active) {
+        // network-spawns need a fresh slate too
+        pProjectile->distanceTraveled = 0.0f;
+        pProjectile->hasBounced = false;
+    }
 }
 
 void setProjectileOwner(Projectile *pProjectile, Player *owner) {
