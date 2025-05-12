@@ -8,18 +8,19 @@
 #include "../include/game_core.h"
 #include "../include/network.h"
 #include "../include/menu.h"
+#include "../include/audio_manager.h"
 
 #define DEFAULT_PORT 7777
 #define DEFAULT_IP   "127.0.0.1"
 
 int main(int argc, char **argv)
 {
-    (void)argc; (void)argv;              /* kommandorader ignoreras – menyn sköter valen  */
+    (void)argc; (void)argv;              /* kommandorader ignoreras – menyn sköter valen  */
 
     /* -------------------------------------------------- */
     /* Init‑block                                         */
     /* -------------------------------------------------- */
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) != 0) {
         printf("SDL Initialization Error: %s\n", SDL_GetError());
         return 1;
     }
@@ -65,9 +66,20 @@ int main(int argc, char **argv)
     }
 
     /* -------------------------------------------------- */
+    /* Initiera ljud och starta bakgrundsmusik            */
+    /* -------------------------------------------------- */
+    ctx.audioManager = createAudioManager();
+    if (!ctx.audioManager) {
+        printf("Warning: Failed to create audio manager. Game will continue without sound.\n");
+    } else {
+        // Start playing background music in a loop
+        playBackgroundMusic(ctx.audioManager);
+    }
+
+    /* -------------------------------------------------- */
     /* Huvudmeny                                          */
     /* -------------------------------------------------- */
-    Menu *menu = menuCreate(ctx.renderer, ctx.window);
+    Menu *menu = menuCreate(ctx.renderer, ctx.window, &ctx);
 
     bool menuRunning = true;
     while (menuRunning) {
@@ -80,7 +92,7 @@ int main(int argc, char **argv)
         if (menuGetChoice(menu) != MENU_CHOICE_NONE)
             break;
 
-        SDL_Delay(16);  /* ~60 fps */
+        SDL_Delay(16);  /* ~60 fps */
     }
 
     /* Hantera menyresultat */
@@ -88,6 +100,9 @@ int main(int argc, char **argv)
     if (choice == MENU_CHOICE_QUIT || choice == MENU_CHOICE_NONE) {
         /* Avsluta programmet */
         menuDestroy(menu);
+        if (ctx.audioManager) {
+            destroyAudioManager(ctx.audioManager);
+        }
         SDL_DestroyRenderer(ctx.renderer);
         SDL_DestroyWindow(ctx.window);
         netShutdown();
@@ -125,6 +140,9 @@ int main(int argc, char **argv)
         printf("Failed to %s: %s\n",
                startAsHost ? "start host" : "connect to server",
                SDLNet_GetError());
+        if (ctx.audioManager) {
+            destroyAudioManager(ctx.audioManager);
+        }
         SDL_DestroyRenderer(ctx.renderer);
         SDL_DestroyWindow(ctx.window);
         netShutdown();
@@ -138,6 +156,9 @@ int main(int argc, char **argv)
     /* -------------------------------------------------- */
     if (!gameInit(&ctx)) {
         printf("Failed to initialize game\n");
+        if (ctx.audioManager) {
+            destroyAudioManager(ctx.audioManager);
+        }
         SDL_DestroyRenderer(ctx.renderer);
         SDL_DestroyWindow(ctx.window);
         netShutdown();

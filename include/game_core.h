@@ -9,6 +9,7 @@
 #include "projectile.h"
 #include "network.h"
 #include "constants.h"
+#include "audio_manager.h"
 
 // Game context structure to replace globals
 typedef struct {
@@ -30,6 +31,9 @@ typedef struct {
     bool showDeathScreen;
     SDL_Texture *fontTexture;
     SDL_Rect spectateButtonRect;
+    
+    // Audio manager
+    AudioManager *audioManager;
 } GameContext;
 
 // Core game functions

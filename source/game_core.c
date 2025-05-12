@@ -11,6 +11,7 @@
 #include "../include/maze.h"
 #include "../include/projectile.h"
 #include "../include/network.h"
+#include "../include/audio_manager.h"
 
 #define UPDATE_RATE 10  // Send position updates every 10 frames
 
@@ -66,6 +67,18 @@ bool gameInit(GameContext *game) {
         if (!game->projectiles[i]) {
             printf("Error: Failed to create projectile %d\n", i);
             return false;
+        }
+    }
+    
+    // Initialize audio manager (only if not already initialized)
+    if (!game->audioManager) {
+        game->audioManager = createAudioManager();
+        if (!game->audioManager) {
+            printf("Warning: Failed to create audio manager. Game will continue without sound.\n");
+            // Continue without audio
+        } else {
+            // Start playing background music in a loop
+            playBackgroundMusic(game->audioManager);
         }
     }
     
@@ -407,6 +420,12 @@ void gameCoreShutdown(GameContext *game) {
         SDL_DestroyTexture(game->fontTexture);
         game->fontTexture = NULL;
     }
+    
+    // Destroy audio manager
+    if (game->audioManager) {
+        destroyAudioManager(game->audioManager);
+        game->audioManager = NULL;
+    }
 }
 
 void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const void *data, int size) {
@@ -504,6 +523,11 @@ void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const v
             // Only show death screen if it's the local player
             if (deadPlayer == game->localPlayer) {
                 game->showDeathScreen = true;
+                
+                // Play death sound
+                if (game->audioManager) {
+                    playDeathSound(game->audioManager);
+                }
             }
             
             // Kill the player
@@ -530,6 +554,11 @@ void checkPlayerProjectileCollisions(GameContext *game) {
                 deactivateProjectile(game->projectiles[i]);
                 // Show death screen
                 game->showDeathScreen = true;
+                
+                // Play death sound
+                if (game->audioManager) {
+                    playDeathSound(game->audioManager);
+                }
                 
                 // Send death message if networked game
                 if (game->isNetworked) {
