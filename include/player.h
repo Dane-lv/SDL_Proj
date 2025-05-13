@@ -29,9 +29,11 @@ float getGunTipPosX(Player *pPlayer);
 float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
 
-// New functions for player elimination
+void playerSetTextureById(Player *pPlayer, SDL_Renderer *pRenderer, int playerId);
+
 bool isPlayerAlive(Player *pPlayer);
 void killPlayer(Player *pPlayer);
 void resetPlayer(Player *pPlayer);
+
 
 #endif 

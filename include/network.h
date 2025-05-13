@@ -5,7 +5,7 @@
 #include <SDL_net.h>
 #include <stdbool.h>
 
-#define MAX_PLAYERS 5      // total slots
+// #define MAX_PLAYERS 5 // Flyttad till constants.h
 #define BUF_SIZE    1024   
 
 // Message types
@@ -18,7 +18,7 @@ enum {
     MSG_DEATH          // client/host: player died
 };
 
-// Message header structure (4 bytes)
+
 typedef struct {
     Uint8 type;        // Message type (MSG_*)
     Uint8 playerId;    // Player ID (0-4)

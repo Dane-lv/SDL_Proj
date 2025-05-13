@@ -21,9 +21,10 @@ struct player
 Player *createPlayer(SDL_Renderer *pRenderer)
 {
     Player *pPlayer = malloc(sizeof(struct player));
-    SDL_Surface *pSurface = IMG_Load("resources/soldiertopdown.png");
+    SDL_Surface *pSurface = IMG_Load("resources/player_1.png");
     if(!pSurface) {
-        printf("Error: %s\n", SDL_GetError());
+        printf("Error loading initial player surface (player_1.png): %s\n", IMG_GetError());
+        free(pPlayer);
         return NULL;
     }
     
@@ -188,4 +189,46 @@ void revertToPreviousPosition(Player *pPlayer)
     pPlayer->y = pPlayer->prevY;
     pPlayer->playerRect.x = (int)pPlayer->x;
     pPlayer->playerRect.y = (int)pPlayer->y;
+}
+
+void playerSetTextureById(Player *pPlayer, SDL_Renderer *pRenderer, int playerId) {
+    if (!pPlayer || !pRenderer) {
+        return;
+    }
+
+    char texturePath[100];
+    int textureFileId = playerId + 1; // Mappa internt ID (0-4) till fil-ID (1-5)
+
+    // MAX_PLAYERS är antalet spelare (t.ex. 5). Giltiga interna playerId är 0 till MAX_PLAYERS-1.
+    // Detta ger textureFileId från 1 till MAX_PLAYERS.
+    if (textureFileId < 1 || textureFileId > MAX_PLAYERS) {
+        printf("Warning: Ogiltigt textureFileId %d (från playerId %d). Använder nuvarande/initial textur.\n", textureFileId, playerId);
+        // Om createPlayer laddade player_1.png, kommer den att behållas.
+        // Om du vill ha en specifik default här (t.ex. player_default.png), ladda den istället.
+        return; 
+    }
+
+    sprintf(texturePath, "resources/player_%d.png", textureFileId);
+
+    SDL_Surface *pSurface = IMG_Load(texturePath);
+    if (!pSurface) {
+        printf("Kunde inte ladda texturyta %s: %s\n", texturePath, IMG_GetError());
+        // Valfritt: Försök ladda en global standardtextur (t.ex. player_1.png eller en player_default.png)
+        // om den specifika numrerade inte hittades.
+        // För nu, om den specifika inte finns, avbryt och behåll den textur spelaren redan har.
+        return; 
+    }
+
+    SDL_Texture *newTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
+    SDL_FreeSurface(pSurface); 
+
+    if (!newTexture) {
+        printf("Kunde inte skapa textur från %s: %s\n", texturePath, SDL_GetError());
+        return;
+    }
+
+    if (pPlayer->pTexture) {
+        SDL_DestroyTexture(pPlayer->pTexture);
+    }
+    pPlayer->pTexture = newTexture;
 }
