@@ -31,4 +31,9 @@ void revertToPreviousPosition(Player *pPlayer);
 
 void playerSetTextureById(Player *pPlayer, SDL_Renderer *pRenderer, int playerId);
 
+bool isPlayerAlive(Player *pPlayer);
+void killPlayer(Player *pPlayer);
+void resetPlayer(Player *pPlayer);
+
+
 #endif 

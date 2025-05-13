@@ -138,47 +138,75 @@ void addWall(Maze* pMaze, int x1, int y1, int x2, int y2)
     }
 }
 
-void drawMap(Maze* pMaze, Camera* pCamera, Player* pPlayer)
+void drawMap(Maze* pMaze, Camera* pCamera, Player* pPlayer, bool isSpectating)
 {
     SDL_Rect pr = getPlayerRect(pPlayer);
     float px = pr.x + pr.w * 0.5f;
     float py = pr.y + pr.h * 0.5f;
+    
+    // Define colors for spectate mode (full brightness)
+    Uint8 spectateWallR = 0;    // Cyan walls
+    Uint8 spectateWallG = 255;
+    Uint8 spectateWallB = 255;
+    
+    Uint8 spectateFloorR = 50;  // Dark gray floor
+    Uint8 spectateFloorG = 50;
+    Uint8 spectateFloorB = 70;
+    
     for (int x = 0; x < TILE_WIDTH; x++)
     {
         for (int y = 0; y < TILE_HEIGHT; y++)
         {
             int worldX = x * 32;
             int worldY = y * 32;
-            float cx = worldX + 16;        
-            float cy = worldY + 16;
-            float dx = cx - px;
-            float dy = cy - py;
-            float dist = sqrtf(dx*dx + dy*dy);
+            
+            // Determine coloring based on spectate mode
+            Uint8 wallR, wallG, wallB;
+            Uint8 floorR, floorG, floorB;
+            
+            if (isSpectating) {
+                // In spectate mode, use full brightness
+                wallR = spectateWallR;
+                wallG = spectateWallG;
+                wallB = spectateWallB;
+                floorR = spectateFloorR;
+                floorG = spectateFloorG;
+                floorB = spectateFloorB;
+            } else {
+                // Normal play mode with fog of war
+                float cx = worldX + 16;        
+                float cy = worldY + 16;
+                float dx = cx - px;
+                float dy = cy - py;
+                float dist = sqrtf(dx*dx + dy*dy);
 
-            float t = 1.0f - dist / FOG_MAX_DIST;      
-            if (t < 0.0f) t = 0.0f;
-            float b = FOG_MIN_BRIGHTNESS + t * (1.0f - FOG_MIN_BRIGHTNESS);
-            /* ---------- skala varje kanal ---------- */
-            Uint8 wallR  = (Uint8)(  0 * b);      /* cyan-väggar: R=0 */
-            Uint8 wallG  = (Uint8)(255 * b);      /*                 G=255 */
-            Uint8 wallB  = (Uint8)(255 * b);      /*                 B=255 */
-
-            Uint8 floorR = (Uint8)( 50 * b);      /* mörkgrått golv */
-            Uint8 floorG = (Uint8)( 50 * b);
-            Uint8 floorB = (Uint8)( 70 * b);
+                float t = 1.0f - dist / FOG_MAX_DIST;      
+                if (t < 0.0f) t = 0.0f;
+                float b = FOG_MIN_BRIGHTNESS + t * (1.0f - FOG_MIN_BRIGHTNESS);
+                
+                wallR  = (Uint8)(  0 * b);    // Cyan walls
+                wallG  = (Uint8)(255 * b);
+                wallB  = (Uint8)(255 * b);
+                floorR = (Uint8)( 50 * b);    // Dark gray floor
+                floorG = (Uint8)( 50 * b);
+                floorB = (Uint8)( 70 * b);
+            }
             
             pMaze->tileRect.x = worldX;
             pMaze->tileRect.y = worldY;
             pMaze->tileRect.w = 32;
             pMaze->tileRect.h = 32;
-            // Konvertera från världskoordinater till skärmkoordinater via kameran
+            
+            // Convert from world coordinates to screen coordinates via camera
             SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, pMaze->tileRect);
-            if (pMaze->tiles[x][y] == 2)          /* vägg */
+            
+            if (pMaze->tiles[x][y] == 2) {    // Wall
                 SDL_SetRenderDrawColor(pMaze->pRenderer, wallR, wallG, wallB, 255);
-            else                                  /* golv */
+            } else {                          // Floor
                 SDL_SetRenderDrawColor(pMaze->pRenderer, floorR, floorG, floorB, 255);
+            }
 
-            // Rendera "fylld rektangel" (eller SDL_RenderCopy om du har en textur)
+            // Render filled rectangle
             SDL_RenderFillRect(pMaze->pRenderer, &adjustedRect);
         }
     }

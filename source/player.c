@@ -15,6 +15,7 @@ struct player
     SDL_Texture *pTexture;
     SDL_Rect playerRect; //rect.x rect.y for rendering after movement math calc
     Object_ID objectID;
+    bool isAlive; // Flag to track if player is alive
 }; 
 
 Player *createPlayer(SDL_Renderer *pRenderer)
@@ -43,6 +44,7 @@ Player *createPlayer(SDL_Renderer *pRenderer)
     pPlayer->vy = 0;
     pPlayer->angle = 0;
     pPlayer->objectID = OBJECT_ID_PLAYER;
+    pPlayer->isAlive = true; // Player starts alive
     
     // Set explicit dimensions instead of querying texture
     pPlayer->playerRect.x = (int)pPlayer->x;
@@ -55,6 +57,9 @@ Player *createPlayer(SDL_Renderer *pRenderer)
 
 void drawPlayer(Player *pPlayer, Camera *pCamera)
 {
+    // Don't draw player if not alive
+    if (!pPlayer->isAlive) return;
+    
     SDL_Rect playerRect = pPlayer->playerRect;
     SDL_Rect adjustedRect = getWorldCoordinatesFromCamera(pCamera, playerRect);
     
@@ -64,6 +69,9 @@ void drawPlayer(Player *pPlayer, Camera *pCamera)
 
 void updatePlayer(Player *pPlayer, float deltaTime)
 {
+    // Don't update movement if player is dead
+    if (!pPlayer->isAlive) return;
+    
     pPlayer->prevX = pPlayer->x;
     pPlayer->prevY = pPlayer->y;
     
@@ -86,19 +94,41 @@ void updatePlayer(Player *pPlayer, float deltaTime)
     pPlayer->playerRect.y = (int)pPlayer->y;
 }
 
+// New functions for player elimination
+bool isPlayerAlive(Player *pPlayer)
+{
+    return pPlayer->isAlive;
+}
+
+void killPlayer(Player *pPlayer)
+{
+    pPlayer->isAlive = false;
+    pPlayer->vx = 0;
+    pPlayer->vy = 0;
+}
+
+void resetPlayer(Player *pPlayer)
+{
+    pPlayer->isAlive = true;
+}
+
 void movePlayerLeft(Player *pPlayer) {
+    if (!pPlayer->isAlive) return; // Don't move if dead
     pPlayer->vx = -PLAYERSPEED;
 }
 
 void movePlayerRight(Player *pPlayer) {
+    if (!pPlayer->isAlive) return; // Don't move if dead
     pPlayer->vx = PLAYERSPEED;
 }
 
 void movePlayerUp(Player *pPlayer) {
+    if (!pPlayer->isAlive) return; // Don't move if dead
     pPlayer->vy = -PLAYERSPEED;
 }
 
 void movePlayerDown(Player *pPlayer) {
+    if (!pPlayer->isAlive) return; // Don't move if dead
     pPlayer->vy = PLAYERSPEED;
 } 
 
