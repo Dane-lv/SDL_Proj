@@ -1,93 +1,89 @@
+#include <stdlib.h>
+#include <math.h>
 #include <SDL.h>
+
 #include "../include/camera.h"
 #include "../include/constants.h"
 #include "../include/player.h"
-#include <stdlib.h>
 
-struct camera
-{
-    float x, y;         // camera position
-    int width, height;  // camera dimensions (viewport)
-    float zoom;         // camera zoom factor
+/* ---------------------------------------------------------- */
+struct camera {
+    float x, y;
+    int   width, height;
+    float zoom;
 };
 
+/* ========================================================== */
 Camera *createCamera(int width, int height)
 {
-    Camera *pCamera = malloc(sizeof(struct camera));
-    pCamera->x = 0;
-    pCamera->y = 0;
-    pCamera->width = width;
-    pCamera->height = height;
-    pCamera->zoom = CAMERA_ZOOM;
-    return pCamera;
+    Camera *c = malloc(sizeof *c);
+    c->x = c->y = 0;
+    c->width  = width;
+    c->height = height;
+    c->zoom   = CAMERA_ZOOM;
+    return c;
 }
 
-void updateCamera(Camera *pCamera, Player *pPlayer)
+/* ---------------------------------------------------------- */
+/*  Auto-zoom som passar exakt inom fönstret                  */
+static float calcSpectateZoom(int camW, int camH)
 {
-    // Get player's position
-    SDL_Rect playerPos = getPlayerPosition(pPlayer);
-    
-    // Calculate effective viewport dimensions based on zoom
-    int effectiveWidth = pCamera->width / pCamera->zoom;
-    int effectiveHeight = pCamera->height / pCamera->zoom;
-    
-    // Always center the camera on the player, regardless of world boundaries
-    pCamera->x = playerPos.x + (playerPos.w / 2) - (effectiveWidth / 2);
-    pCamera->y = playerPos.y + (playerPos.h / 2) - (effectiveHeight / 2);
-    
-    // No boundary checks - allow camera to follow player everywhere
+    float zx = (float)camW / WORLD_WIDTH;
+    float zy = (float)camH / WORLD_HEIGHT;
+    return fminf(zx, zy);
 }
 
-// New function for spectate mode view
-void setCameraSpectateMode(Camera *pCamera, bool enabled)
+/* ========================================================== */
+void updateCamera(Camera *c, Player *p)
+{
+    SDL_Rect pr = getPlayerPosition(p);
+
+    int effW = c->width  / c->zoom;
+    int effH = c->height / c->zoom;
+
+    c->x = pr.x + pr.w * 0.5f - effW * 0.5f;
+    c->y = pr.y + pr.h * 0.5f - effH * 0.5f;
+}
+
+/* ---------------------------------------------------------- */
+void setCameraSpectateMode(Camera *c, bool enabled)
 {
     if (enabled) {
-        // Set a zoomed out view centered on the map
-        pCamera->zoom = SPECTATE_ZOOM;
-        pCamera->x = WORLD_WIDTH / 2 - ((pCamera->width / pCamera->zoom) / 2);
-        pCamera->y = WORLD_HEIGHT / 2 - ((pCamera->height / pCamera->zoom) / 2);
+        c->zoom = calcSpectateZoom(c->width, c->height);
+
+        int effW = c->width  / c->zoom;
+        int effH = c->height / c->zoom;
+        c->x = WORLD_WIDTH  * 0.5f - effW * 0.5f;
+        c->y = WORLD_HEIGHT * 0.5f - effH * 0.5f;
     } else {
-        // Reset to normal zoom
-        pCamera->zoom = CAMERA_ZOOM;
+        c->zoom = CAMERA_ZOOM;
     }
 }
 
-// Set camera position directly
-void setCameraPosition(Camera *pCamera, float x, float y)
+/* ---------------------------------------------------------- */
+void setCameraPosition(Camera *c, float x, float y)
 {
-    // Calculate effective viewport dimensions based on zoom
-    int effectiveWidth = pCamera->width / pCamera->zoom;
-    int effectiveHeight = pCamera->height / pCamera->zoom;
-    
-    // Center the camera on the given coordinates
-    pCamera->x = x - (effectiveWidth / 2);
-    pCamera->y = y - (effectiveHeight / 2);
+    int effW = c->width  / c->zoom;
+    int effH = c->height / c->zoom;
+    c->x = x - effW * 0.5f;
+    c->y = y - effH * 0.5f;
 }
 
-SDL_Rect getWorldCoordinatesFromCamera(Camera *pCamera, SDL_Rect entityRect)
+/* ---------------------------------------------------------- */
+SDL_Rect getWorldCoordinatesFromCamera(Camera *c, SDL_Rect r)
 {
-    SDL_Rect cameraAdjustedRect = entityRect;
-    
-    // Calculate screen coordinates by subtracting camera position and applying zoom
-    cameraAdjustedRect.x = (int)((entityRect.x - pCamera->x) * pCamera->zoom);
-    cameraAdjustedRect.y = (int)((entityRect.y - pCamera->y) * pCamera->zoom);
-    cameraAdjustedRect.w = (int)(entityRect.w * pCamera->zoom);
-    cameraAdjustedRect.h = (int)(entityRect.h * pCamera->zoom);
-    
-    return cameraAdjustedRect;
+    SDL_Rect out = r;
+
+    out.x = (int)((r.x - c->x) * c->zoom);
+    out.y = (int)((r.y - c->y) * c->zoom);
+    out.w = (int)(r.w * c->zoom);
+    out.h = (int)(r.h * c->zoom);
+
+    return out;
 }
 
-int getCameraX(Camera *pCamera)
-{
-    return (int)pCamera->x;
-}
+int getCameraX(Camera *c) { return (int)c->x; }
+int getCameraY(Camera *c) { return (int)c->y; }
 
-int getCameraY(Camera *pCamera)
-{
-    return (int)pCamera->y;
-}
-
-void destroyCamera(Camera *pCamera)
-{
-    free(pCamera);
-} 
+/* ---------------------------------------------------------- */
+void destroyCamera(Camera *c) { free(c); }
