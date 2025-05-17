@@ -3,312 +3,231 @@
 #include <string.h>
 #include <stdio.h>
 
-// nätverksmeddelanden till spelet
-static void dispatchMessage(NetMgr *nm, Uint8 type, Uint8 playerId, const void *data, int size) {
+/* --------------------------------------------------------- */
+static void dispatchMessage(NetMgr *nm, Uint8 type, Uint8 playerId,
+                            const void *data, int size)
+{
     if (nm->userData) {
-        GameContext *game = (GameContext*)nm->userData;
-        gameOnNetworkMessage(game, type, playerId, data, size);
+        GameContext *g = (GameContext *)nm->userData;
+        gameOnNetworkMessage(g, type, playerId, data, size);
     }
 }
 
+/* --------------------------------------------------------- */
+/* === NYTT: hjälp som går igenom *flera* meddelanden i buffern */
+static void processBuffer(NetMgr *nm, const char *buf, int len)
+{
+    int off = 0;
+    while (off + (int)sizeof(MessageHeader) <= len)
+    {
+        const MessageHeader *h = (const MessageHeader *)(buf + off);
+        int full = sizeof(MessageHeader) + h->size;
+        if (off + full > len) break;      /* trasigt/halvt paket */
 
-bool netInit(void) {
-    return SDLNet_Init() == 0;
+        /* --- klient-side räkning av peerCount --------------- */
+        if (!nm->isHost && h->type == MSG_JOIN) {
+            if (nm->localPlayerId == 0xFF) {
+                nm->localPlayerId = h->playerId;
+                nm->peerCount     = 1;                /* mig själv */
+            } else if (h->playerId != 0) {            /* ej host   */
+                ++nm->peerCount;
+            }
+        }
+
+        /* vidare till spel-logiken */
+        dispatchMessage(nm, h->type, h->playerId,
+                        buf + off + sizeof(MessageHeader), h->size);
+
+        off += full;
+    }
 }
+/* --------------------------------------------------------- */
+bool netInit(void)     { return SDLNet_Init() == 0; }
+void netShutdown(void) { SDLNet_Quit(); }
 
-
-void netShutdown(void) {
-    SDLNet_Quit();
-}
-
-
-bool hostStart(NetMgr *nm, int port) {
+/* ========================================================= */
+/*                       HOST-SIDAN                          */
+/* ========================================================= */
+bool hostStart(NetMgr *nm, int port)
+{
     IPaddress ip;
-    
-    // Konfigurera IP-adress för att lyssna
-    if (SDLNet_ResolveHost(&ip, NULL, port) < 0) {
-        printf("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
-        return false;
-    }
-    
-    // Skapa socket
+    if (SDLNet_ResolveHost(&ip, NULL, port) < 0) return false;
+
     nm->set = SDLNet_AllocSocketSet(MAX_PLAYERS + 1);
-    if (!nm->set) {
-        printf("SDLNet_AllocSocketSet: %s\n", SDLNet_GetError());
-        return false;
-    }
-    
-    // Skapa server socket
+    if (!nm->set) return false;
+
     nm->server = SDLNet_TCP_Open(&ip);
-    if (!nm->server) {
-        printf("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
-        SDLNet_FreeSocketSet(nm->set);
-        return false;
-    }
-    
+    if (!nm->server) { SDLNet_FreeSocketSet(nm->set); return false; }
 
     SDLNet_TCP_AddSocket(nm->set, nm->server);
-    
-    // Initiera anslutningsräknare och spelar-ID
-    nm->peerCount = 0;
-    nm->isHost = true;
-    nm->localPlayerId = 0;  // Host är alltid spelare 0
-    
-    printf("Värddator startad på port %d\n", port);
+    nm->peerCount      = 0;
+    nm->isHost         = true;
+    nm->localPlayerId  = 0;          /* host = id 0 */
     return true;
 }
 
-
-void hostTick(NetMgr *nm, void *game) {
+/* --------------------------------------------------------- */
+void hostTick(NetMgr *nm, void *game)
+{
     nm->userData = game;
-    
-    // Kontrollera om någon socket har data att läsa
     int ready = SDLNet_CheckSockets(nm->set, 0);
     if (ready <= 0) return;
 
-    // Acceptera nya anslutningar
-    if (SDLNet_SocketReady(nm->server) && nm->peerCount < MAX_PLAYERS-1) {
-        TCPsocket newClient = SDLNet_TCP_Accept(nm->server);
-        if (newClient) {
-            // Tilldela ett spelar-ID till den nya klienten
-            Uint8 newPlayerId = nm->peerCount + 1;
-            
-            // Lagra klientens socket
-            nm->peers[nm->peerCount++] = newClient;
-            SDLNet_TCP_AddSocket(nm->set, newClient);
-            
-            // Skicka bekräftelse med tilldelat spelar-ID
-            MessageHeader header = {
-                .type = MSG_JOIN,
-                .playerId = newPlayerId,
-                .size = 0
-            };
-            
-            memcpy(nm->buf, &header, sizeof(MessageHeader));
-            SDLNet_TCP_Send(newClient, nm->buf, sizeof(MessageHeader));
-            
-            printf("Ny klient ansluten, ID: %d\n", newPlayerId);
+/* -------- 1) acceptera nya anslutningar ------------------ */
+    if (SDLNet_SocketReady(nm->server) && nm->peerCount < MAX_PLAYERS-1)
+    {
+        TCPsocket c = SDLNet_TCP_Accept(nm->server);
+        if (c) {
+            Uint8 newId = nm->peerCount + 1;
+            nm->peers[nm->peerCount++] = c;
+            SDLNet_TCP_AddSocket(nm->set, c);
+
+            /* a) broadcast JOIN för den nya spelaren */
+            MessageHeader h = { MSG_JOIN, newId, 0 };
+            memcpy(nm->buf, &h, sizeof h);
+
+            SDLNet_TCP_Send(c, nm->buf, sizeof h);           /* till nya  */
+            for (int i = 0; i < nm->peerCount-1; ++i)        /* gamla     */
+                SDLNet_TCP_Send(nm->peers[i], nm->buf, sizeof h);
+            dispatchMessage(nm, MSG_JOIN, newId, NULL, 0);   /* hosten    */
+
+            /* b) skicka JOIN-rad för alla äldre spelare → nya klienten */
+            for (Uint8 id = 0; id < newId; ++id) {
+                MessageHeader j = { MSG_JOIN, id, 0 };
+                memcpy(nm->buf, &j, sizeof j);
+                SDLNet_TCP_Send(c, nm->buf, sizeof j);
+            }
         }
-        ready--;
+        --ready;
     }
 
-    // Ta emot data från klienter och vidarebefordra
-    for (int i = 0; i < nm->peerCount && ready > 0; ++i) {
+/* -------- 2) trafik från klienter ----------------------- */
+    for (int i = 0; i < nm->peerCount && ready > 0; ++i)
+    {
         TCPsocket s = nm->peers[i];
         if (SDLNet_SocketReady(s)) {
             int len = SDLNet_TCP_Recv(s, nm->buf, BUF_SIZE);
-            
+
             if (len <= 0) {
-                // Klienten har kopplat från
-                printf("Klient %d kopplade från\n", i + 1);
                 SDLNet_TCP_DelSocket(nm->set, s);
                 SDLNet_TCP_Close(s);
-                
-                // Flytta resterande klienter för att fylla luckan
-                if (i < nm->peerCount - 1) {
-                    nm->peers[i] = nm->peers[nm->peerCount - 1];
-                }
-                nm->peerCount--;
-                i--;
-            } 
-            else if ((unsigned int)len >= sizeof(MessageHeader)) {
-                // Bearbeta mottagen data
-                MessageHeader *header = (MessageHeader*)nm->buf;
-                
-                // Bearbeta meddelandet lokalt först
-                dispatchMessage(nm, header->type, header->playerId, 
-                               nm->buf + sizeof(MessageHeader), 
-                               header->size);
-                
-                // Vidarebefordra till alla andra klienter
-                for (int j = 0; j < nm->peerCount; ++j) {
-                    if (j != i) {  // Skicka inte tillbaka till avsändaren
-                        SDLNet_TCP_Send(nm->peers[j], nm->buf, len);
-                    }
-                }
+                nm->peers[i] = nm->peers[--nm->peerCount];
+                --i;
             }
-            ready--;
+            else {
+                /* avkoda kanske flera paket, forwarda samma rå-buffer
+                   till övriga klienter i ett stycke                 */
+                processBuffer(nm, nm->buf, len);
+
+                for (int j = 0; j < nm->peerCount; ++j)
+                    if (j != i) SDLNet_TCP_Send(nm->peers[j], nm->buf, len);
+            }
+            --ready;
         }
     }
 }
 
-// Ansluter en klient till en värddator
-bool clientConnect(NetMgr *nm, const char *ip, int port) {
-    IPaddress serverIP;
-    
-    // Hämta serverns IP-adress
-    if (SDLNet_ResolveHost(&serverIP, ip, port) < 0) {
-        printf("SDLNet_ResolveHost: %s\n", SDLNet_GetError());
-        return false;
-    }
-    
-    // Skapa klientsocket och anslut till servern
-    nm->client = SDLNet_TCP_Open(&serverIP);
-    if (!nm->client) {
-        printf("SDLNet_TCP_Open: %s\n", SDLNet_GetError());
-        return false;
-    }
-    
-    // övervaka anslutningen
+/* ========================================================= */
+/*                       KLIENT-SIDAN                        */
+/* ========================================================= */
+bool clientConnect(NetMgr *nm, const char *ip, int port)
+{
+    IPaddress srv;
+    if (SDLNet_ResolveHost(&srv, ip, port) < 0) return false;
+
+    nm->client = SDLNet_TCP_Open(&srv);
+    if (!nm->client) return false;
+
     nm->set = SDLNet_AllocSocketSet(1);
-    if (!nm->set) {
-        printf("SDLNet_AllocSocketSet: %s\n", SDLNet_GetError());
-        SDLNet_TCP_Close(nm->client);
-        return false;
-    }
-    
-    // Lägg till klientsocketen i uppsättningen
+    if (!nm->set) { SDLNet_TCP_Close(nm->client); return false; }
+
     SDLNet_TCP_AddSocket(nm->set, nm->client);
-    
-    // Initiera klientstatus
-    nm->isHost = false;
-    nm->localPlayerId = 0xFF;  // Ogiltigt ID tills det tilldelas av värden
-    
-    printf("Ansluten till server på %s:%d\n", ip, port);
+    nm->isHost        = false;
+    nm->localPlayerId = 0xFF;
+    nm->peerCount     = 0;
     return true;
 }
 
-// Uppdaterar klienten (anropas varje bildruta)
-void clientTick(NetMgr *nm, void *game) {
+/* --------------------------------------------------------- */
+void clientTick(NetMgr *nm, void *game)
+{
     nm->userData = game;
-    
-    // Kontrollera om socketen har data att läsa
-    int ready = SDLNet_CheckSockets(nm->set, 0);
-    if (ready <= 0) return;
-    
+    if (SDLNet_CheckSockets(nm->set, 0) <= 0) return;
+
     if (SDLNet_SocketReady(nm->client)) {
-        // Ta emot data från servern
         int len = SDLNet_TCP_Recv(nm->client, nm->buf, BUF_SIZE);
-        
-        if (len <= 0) {
-            // Frånkopplad från servern
-            printf("Frånkopplad från servern\n");
-            return;
-        } 
-        else if ((unsigned int)len >= sizeof(MessageHeader)) {
-            MessageHeader *header = (MessageHeader*)nm->buf;
-            
-            // Kontrollera om detta är en JOIN-bekräftelse
-            if (header->type == MSG_JOIN && nm->localPlayerId == 0xFF) {
-                nm->localPlayerId = header->playerId;
-                printf("Tilldelat spelar-ID: %d\n", nm->localPlayerId);
-            }
-            
-            // Bearbeta mottagen data
-            dispatchMessage(nm, header->type, header->playerId,
-                          nm->buf + sizeof(MessageHeader),
-                          header->size);
-        }
+        if (len <= 0) return;
+
+        processBuffer(nm, nm->buf, len);          /* === NYTT === */
     }
 }
 
-// Skickar spelarens position till nätverket
-bool sendPlayerPosition(NetMgr *nm, float x, float y, float angle) {
-    // Skapa meddelandehuvud
-    MessageHeader header = {
-        .type = MSG_POS,
-        .playerId = nm->localPlayerId,
-        .size = sizeof(float) * 3
-    };
-    
-    // Kopiera huvud och positionsdata till bufferten
-    memcpy(nm->buf, &header, sizeof(MessageHeader));
-    
-    float* posData = (float*)(nm->buf + sizeof(MessageHeader));
-    posData[0] = x;
-    posData[1] = y;
-    posData[2] = angle;
-    
-    int totalSize = sizeof(MessageHeader) + sizeof(float) * 3;
-    
-    // Skicka data baserat på om det är värd eller klient
-    if (nm->isHost) {
-        // Värden skickar till alla klienter
-        for (int i = 0; i < nm->peerCount; i++) {
-            if (SDLNet_TCP_Send(nm->peers[i], nm->buf, totalSize) < totalSize) {
-                return false;
-            }
-        }
-        // Bearbeta också lokalt
-        dispatchMessage(nm, MSG_POS, nm->localPlayerId, posData, header.size);
-        return true;
-    } else {
-        // Klienten skickar bara till värden
-        return SDLNet_TCP_Send(nm->client, nm->buf, totalSize) == totalSize;
-    }
+/* ========================================================= */
+/*                 SKICKA HÄNDELSER – oförändrat             */
+/* ========================================================= */
+
+static bool sendToAll(NetMgr *nm, int total)
+{
+    for (int i = 0; i < nm->peerCount; ++i)
+        if (SDLNet_TCP_Send(nm->peers[i], nm->buf, total) < total)
+            return false;
+    return true;
 }
 
-// Skickar spelarens skotthändelse till nätverket
-bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle, int projectileId) {
-    // Skapa meddelandehuvud
-    MessageHeader header = {
-        .type = MSG_SHOOT,
-        .playerId = nm->localPlayerId,
-        .size = sizeof(float) * 3 + sizeof(int)  // Added space for projectileId
-    };
-    
-    // Kopiera huvud och skottdata till bufferten
-    memcpy(nm->buf, &header, sizeof(MessageHeader));
-    
-    float* shootData = (float*)(nm->buf + sizeof(MessageHeader));
-    shootData[0] = x;
-    shootData[1] = y;
-    shootData[2] = angle;
-    
-    // Add projectile ID after the float data
-    int* idPtr = (int*)(nm->buf + sizeof(MessageHeader) + sizeof(float) * 3);
-    *idPtr = projectileId;
-    
-    int totalSize = sizeof(MessageHeader) + sizeof(float) * 3 + sizeof(int);
-    
-    // Skicka data baserat på om det är värd eller klient
-    if (nm->isHost) {
-        // Värden skickar till alla klienter
-        for (int i = 0; i < nm->peerCount; i++) {
-            if (SDLNet_TCP_Send(nm->peers[i], nm->buf, totalSize) < totalSize) {
-                return false;
-            }
-        }
-        // Bearbeta också lokalt
-        dispatchMessage(nm, MSG_SHOOT, nm->localPlayerId, shootData, header.size);
-        return true;
-    } else {
-        // Klienten skickar bara till värden
-        return SDLNet_TCP_Send(nm->client, nm->buf, totalSize) == totalSize;
-    }
+/* ---- position ------------------------------------------- */
+bool sendPlayerPosition(NetMgr *nm,float x,float y,float a)
+{
+    MessageHeader h={MSG_POS,nm->localPlayerId,sizeof(float)*3};
+    memcpy(nm->buf,&h,sizeof h);
+    float *d=(float *)(nm->buf+sizeof h); d[0]=x; d[1]=y; d[2]=a;
+    int tot=sizeof h+sizeof(float)*3;
+
+    if(nm->isHost){ sendToAll(nm,tot);
+        dispatchMessage(nm,MSG_POS,nm->localPlayerId,d,h.size);
+        return true;}
+    return SDLNet_TCP_Send(nm->client,nm->buf,tot)==tot;
 }
 
-// Sends player death notification to the network
-bool sendPlayerDeath(NetMgr *nm, Uint8 killedByPlayerId) {
-    // Create message header
-    MessageHeader header = {
-        .type = MSG_DEATH,
-        .playerId = nm->localPlayerId,
-        .size = sizeof(Uint8)  // Size of killedByPlayerId
-    };
-    
-    // Copy header and death data to buffer
-    memcpy(nm->buf, &header, sizeof(MessageHeader));
-    
-    // Set the killed-by player ID in the buffer
-    Uint8* deathData = (Uint8*)(nm->buf + sizeof(MessageHeader));
-    *deathData = killedByPlayerId;
-    
-    int totalSize = sizeof(MessageHeader) + sizeof(Uint8);
-    
-    // Send data based on whether it's host or client
-    if (nm->isHost) {
-        // Host sends to all clients
-        for (int i = 0; i < nm->peerCount; i++) {
-            if (SDLNet_TCP_Send(nm->peers[i], nm->buf, totalSize) < totalSize) {
-                return false;
-            }
-        }
-        // Process locally as well
-        dispatchMessage(nm, MSG_DEATH, nm->localPlayerId, deathData, header.size);
+/* ---- shoot ---------------------------------------------- */
+bool sendPlayerShoot(NetMgr *nm,float x,float y,float a,int pid)
+{
+    MessageHeader h={MSG_SHOOT,nm->localPlayerId,sizeof(float)*3+sizeof(int)};
+    memcpy(nm->buf,&h,sizeof h);
+    float *d=(float *)(nm->buf+sizeof h); d[0]=x; d[1]=y; d[2]=a;
+    int *id=(int *)(nm->buf+sizeof h+sizeof(float)*3); *id=pid;
+    int tot=sizeof h+sizeof(float)*3+sizeof(int);
+
+    if(nm->isHost){ sendToAll(nm,tot);
+        dispatchMessage(nm,MSG_SHOOT,nm->localPlayerId,d,h.size);
+        return true;}
+    return SDLNet_TCP_Send(nm->client,nm->buf,tot)==tot;
+}
+
+/* ---- death ---------------------------------------------- */
+bool sendPlayerDeath(NetMgr *nm, Uint8 killerId)
+{
+    MessageHeader h={MSG_DEATH,nm->localPlayerId,sizeof(Uint8)};
+    memcpy(nm->buf,&h,sizeof h);
+    nm->buf[sizeof h]=killerId;
+    int tot=sizeof h+sizeof(Uint8);
+
+    if(nm->isHost){ sendToAll(nm,tot);
+        dispatchMessage(nm,MSG_DEATH,nm->localPlayerId,
+                        nm->buf+sizeof h,h.size);
+        return true;}
+    return SDLNet_TCP_Send(nm->client,nm->buf,tot)==tot;
+}
+
+/* ---- start ---------------------------------------------- */
+bool sendStartGame(NetMgr *nm)
+{
+    MessageHeader h={MSG_START,nm->localPlayerId,0};
+    memcpy(nm->buf,&h,sizeof h);
+
+    if(nm->isHost){
+        sendToAll(nm,sizeof h);
+        dispatchMessage(nm,MSG_START,nm->localPlayerId,NULL,0);
         return true;
-    } else {
-        // Client only sends to host
-        return SDLNet_TCP_Send(nm->client, nm->buf, totalSize) == totalSize;
     }
+    return false;
 }
