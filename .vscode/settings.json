@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "audio_manager.h": "c",
+        "stdbool.h": "c"
+    }
+}

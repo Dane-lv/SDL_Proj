@@ -1,6 +1,7 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#include "constants.h"
 #include <SDL.h>
 #include <SDL_net.h>
 #include <stdbool.h>
