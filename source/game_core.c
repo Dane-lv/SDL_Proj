@@ -1,11 +1,14 @@
+
 #include <stdio.h>
+#include <math.h>
+#include <string.h>
+#include <stdbool.h>
+
 #include <SDL.h>
 #include <SDL_ttf.h>
-#include <stdbool.h>
-#include <math.h>     
-#include <string.h>
-#include "../include/game_core.h"
+
 #include "../include/constants.h"
+#include "../include/game_core.h"
 #include "../include/player.h"
 #include "../include/camera.h"
 #include "../include/maze.h"
@@ -13,680 +16,518 @@
 #include "../include/network.h"
 #include "../include/audio_manager.h"
 
-#define UPDATE_RATE 10  // Send position updates every 10 frames
+/* hur ofta lokala positioner pushas ut på nätet */
+#define UPDATE_RATE 10        /* var 10:e bildruta */
 
-// Function declarations
-static void setWindowTitle(GameContext *game, const char *title);
-void initDeathScreen(GameContext *game);
-void renderDeathScreen(GameContext *game);
-void enableSpectateMode(GameContext *game);
-void checkPlayerProjectileCollisions(GameContext *game);
+/* ----------------------------------------------------------
+ *  Främst privata hjälp-prototyper
+ * ---------------------------------------------------------- */
+static void setWindowTitle     (GameContext *, const char *);
+static void initDeathScreen    (GameContext *);
+static void renderDeathScreen  (GameContext *);
+static void enableSpectateMode (GameContext *);
+static void checkPlayerProjectileCollisions(GameContext *);
 
-// Helper function to set window title with connection info
-static void setWindowTitle(GameContext *game, const char *title) {
-    if (game->window) {
-        SDL_SetWindowTitle(game->window, title);
-    }
+/* ==========================================================
+ *                 INITIALISERING
+ * ========================================================== */
+static void setWindowTitle(GameContext *g, const char *title)
+{
+    if (g->window) SDL_SetWindowTitle(g->window, title);
 }
 
-bool gameInit(GameContext *game) {
-    // Players array initialization
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        game->players[i] = NULL;
+/* ---------------------------------------------------------- */
+bool gameInit(GameContext *g)
+{
+    /* ---------------- spelare / projektilarrayer ---------- */
+    for (int i = 0; i < MAX_PLAYERS; ++i) g->players[i] = NULL;
+
+    g->localPlayer = createPlayer(g->renderer);
+    if (!g->localPlayer) { SDL_Log("createPlayer fail"); return false; }
+
+    if (g->isHost)
+        playerSetTextureById(g->localPlayer, g->renderer, 0);
+
+    g->players[0] = g->localPlayer;
+
+    /* ---------------- Maze -------------------------------- */
+    g->maze = createMaze(g->renderer, NULL, NULL);
+    if (!g->maze) return false;
+    initiateMap(g->maze);
+    generateMazeLayout(g->maze);
+
+    /* ---------------- Kamera ------------------------------ */
+    g->camera = createCamera(WINDOW_WIDTH, WINDOW_HEIGHT);
+    if (!g->camera) return false;
+
+    /* ---------------- Projektiler ------------------------- */
+    for (int i = 0; i < MAX_PROJECTILES; ++i) {
+        g->projectiles[i] = createProjectile(g->renderer);
+        if (!g->projectiles[i]) return false;
     }
 
-    // Create local player
-    game->localPlayer = createPlayer(game->renderer);
-    if (!game->localPlayer) {
-        printf("Error creating player: %s\n", SDL_GetError());
-        return false;
-    }
-    // For host, set texture for player ID 0 immediately
-    if (game->isHost) {
-        playerSetTextureById(game->localPlayer, game->renderer, 0);
-    }
-    
-    // Store local player in player array (will be updated when ID is assigned)
-    game->players[0] = game->localPlayer;
-
-    // Create maze
-    game->maze = createMaze(game->renderer, NULL, NULL);  // Removed texture references
-    if (!game->maze) {
-        printf("Maze Creation Error: %s\n", SDL_GetError());
-        return false;
-    }
-    initiateMap(game->maze);
-    generateMazeLayout(game->maze);
-    
-    // Create camera
-    game->camera = createCamera(WINDOW_WIDTH, WINDOW_HEIGHT);
-    if (!game->camera) {
-        printf("Error: Failed to create camera\n");
-        return false;
+    /* ---------------- Ljud (om ej redan init) ------------- */
+    if (!g->audioManager) {
+        g->audioManager = createAudioManager();
+        if (g->audioManager)
+            playBackgroundMusic(g->audioManager);
     }
 
-    // Initialize projectiles
-    for (int i = 0; i < MAX_PROJECTILES; i++) {
-        game->projectiles[i] = createProjectile(game->renderer);
-        if (!game->projectiles[i]) {
-            printf("Error: Failed to create projectile %d\n", i);
-            return false;
-        }
-    }
-    
-    // Initialize audio manager (only if not already initialized)
-    if (!game->audioManager) {
-        game->audioManager = createAudioManager();
-        if (!game->audioManager) {
-            printf("Warning: Failed to create audio manager. Game will continue without sound.\n");
-            // Continue without audio
+    /* ---------------- Död-/spectate-UI -------------------- */
+    g->isSpectating   = false;
+    g->showDeathScreen = false;
+
+    SDL_Surface *s =
+        TTF_RenderText_Blended(TTF_OpenFont("resources/font.ttf", 64),
+                               "YOU DIED",
+                               (SDL_Color){255, 0, 0, 255});
+    g->fontTexture = s ? SDL_CreateTextureFromSurface(g->renderer, s) : NULL;
+    if (s) SDL_FreeSurface(s);
+
+    initDeathScreen(g);
+
+    /* ---------------- Första spawn-placering -------------- */
+    if (g->isNetworked) {
+        if (g->isHost) {
+            setWindowTitle(g, "Maze Mayhem - HOST");
+            setPlayerPosition(g->localPlayer, 50.0f, 50.0f);            /* TL */
         } else {
-            // Start playing background music in a loop
-            playBackgroundMusic(game->audioManager);
-        }
-    }
-    
-    // Initialize death screen and spectate mode
-    game->isSpectating = false;
-    game->showDeathScreen = false;
-    
-    // Create "YOU DIED" text texture
-    SDL_Surface *textSurface = TTF_RenderText_Blended(
-        TTF_OpenFont("resources/font.ttf", 64),
-        "YOU DIED",
-        (SDL_Color){255, 0, 0, 255} // Red
-    );
-    if (textSurface) {
-        game->fontTexture = SDL_CreateTextureFromSurface(game->renderer, textSurface);
-        SDL_FreeSurface(textSurface);
-    } else {
-        game->fontTexture = NULL;
-        printf("Warning: Failed to create font texture\n");
-    }
-    
-    // Initialize spectate button rectangle
-    initDeathScreen(game);
-    
-    // Set window title based on connection type
-    if (game->isNetworked) {
-        if (game->isHost) {
-            setWindowTitle(game, "Maze Mayhem - HOST");
-            
-            // For host, player ID is always 0
-            // Spawn host (Player 0) in the Top-Left corner
-            float corner_margin = 50.0f; // Margin from the absolute corner
-            setPlayerPosition(game->localPlayer, corner_margin, corner_margin);
-        } else {
-            setWindowTitle(game, "Maze Mayhem - CLIENT");
+            setWindowTitle(g, "Maze Mayhem - CLIENT");
+            /* klient får exakt pos först när host svarat med ID */
         }
     } else {
-        setWindowTitle(game, "Maze Mayhem - OFFLINE");
-        setPlayerPosition(game->localPlayer, 400, 300);
+        setWindowTitle(g, "Maze Mayhem - OFFLINE");
+        setPlayerPosition(g->localPlayer, 400, 300);
     }
 
-    game->isRunning = true;
-    game->frameCounter = 0;
-    
+    g->isRunning    = true;
+    g->frameCounter = 0;
     return true;
 }
 
-void gameCoreRunFrame(GameContext *game) {
+/* ==========================================================
+ *                 HUVUD-LOOP (en bildruta)
+ * ========================================================== */
+void gameCoreRunFrame(GameContext *g)
+{
     static Uint32 lastTime = 0;
-    static bool initialPosSet = false;
+    static bool   initialClientPosSet = false;
 
-    // Initialize lastTime on first call
     if (lastTime == 0) {
         lastTime = SDL_GetTicks();
-        initialPosSet = game->isHost; // Already set for host
+        initialClientPosSet = g->isHost;  /* host fick spawn direkt */
     }
 
-    // Handle time and delta time
-    Uint32 currentTime = SDL_GetTicks();
-    float deltaTime = (currentTime - lastTime) / 1000.0f;
-    lastTime = currentTime;
-    
-    // Handle events
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
-            game->isRunning = false;
-        } else {
-            handleInput(game, &event);
-        }
+    Uint32 now = SDL_GetTicks();
+    float  dt  = (now - lastTime) / 1000.0f;
+    lastTime   = now;
+
+    /* ----------- indata ---------------------------------- */
+    SDL_Event ev;
+    while (SDL_PollEvent(&ev)) {
+        if (ev.type == SDL_QUIT) g->isRunning = false;
+        else handleInput(g, &ev);
     }
-    
-    // Update game state
-    updateGame(game, deltaTime);
-    updatePlayerRotation(game);
-    
-    // Network update
-    if (game->isNetworked) {
-        if (game->isHost) {
-            hostTick(&game->netMgr, game);
-        } else {
-            clientTick(&game->netMgr, game);
-            
-            // If we're a client and we just got assigned a player ID, set initial position
-            if (!initialPosSet && game->netMgr.localPlayerId != 0xFF) {
-                float startX, startY;
-                float corner_margin = 50.0f; // Margin from the absolute corner
-                Uint8 id = game->netMgr.localPlayerId;
 
-                if (id == 1) { // Top-Right
-                    startX = WINDOW_WIDTH - PLAYERWIDTH - corner_margin;
-                    startY = corner_margin;
-                } else if (id == 2) { // Bottom-Left
-                    startX = corner_margin;
-                    startY = WINDOW_HEIGHT - (2 * PLAYERHEIGHT) - corner_margin;
-                } else if (id == 3) { // Bottom-Right
-                    startX = WINDOW_WIDTH - PLAYERWIDTH - corner_margin;
-                    startY = WINDOW_HEIGHT - PLAYERHEIGHT - corner_margin;
-                } else if (id == 4) { // Center
-                    startX = WINDOW_WIDTH / 2.0f - PLAYERWIDTH / 2.0f;
-                    startY = WINDOW_HEIGHT / 2.0f - PLAYERHEIGHT / 2.0f;
-                } else {
-                    // Fallback for unexpected IDs or if MAX_PLAYERS is increased
-                    // Default to a slightly offset position
-                    startX = 100.0f + (id * PLAYERWIDTH * 1.5f); // Spread them out a bit
-                    startY = 100.0f;
+    /* ----------- logik ----------------------------------- */
+    updateGame(g, dt);
+    updatePlayerRotation(g);
+
+    /* ----------- nätverk --------------------------------- */
+    if (g->isNetworked) {
+        if (g->isHost)
+            hostTick(&g->netMgr, g);
+        else {
+            clientTick(&g->netMgr, g);
+
+            /* när klient fått giltigt ID → ge start-position */
+            if (!initialClientPosSet && g->netMgr.localPlayerId != 0xFF) {
+                float x, y, margin = 50.0f;
+                Uint8 id = g->netMgr.localPlayerId;
+
+                if (id == 1) {                 /* Top-Right */
+                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
+                    y = margin;
+                } else if (id == 2) {          /* Bottom-Left */
+                    x = margin;
+                    y = WORLD_HEIGHT - 2 * PLAYERHEIGHT - margin;
+                } else if (id == 3) {          /* Bottom-Right */
+                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
+                    y = WORLD_HEIGHT - PLAYERHEIGHT - margin;
+                } else {                       /* id == 4 eller fler */
+                    x = WORLD_WIDTH  / 2.0f - PLAYERWIDTH  / 2.0f;
+                    y = WORLD_HEIGHT / 2.0f - PLAYERHEIGHT / 2.0f;
                 }
 
-                setPlayerPosition(game->localPlayer, startX, startY);
-                initialPosSet = true;
-                // Set texture for the local client player now that ID is known
-                playerSetTextureById(game->localPlayer, game->renderer, id);
-                
-                // Update our local player index in the players array
-                if (game->players[0] == game->localPlayer) {
-                    game->players[0] = NULL;
-                }
-                game->players[game->netMgr.localPlayerId] = game->localPlayer;
-                
-                // Immediately send our position to other players
-                SDL_Rect pos = getPlayerPosition(game->localPlayer);
-                float angle = getPlayerAngle(game->localPlayer);
-                sendPlayerPosition(&game->netMgr, (float)pos.x, (float)pos.y, angle);
+                setPlayerPosition(g->localPlayer, x, y);
+                initialClientPosSet = true;
+
+                /* egen textur */
+                playerSetTextureById(g->localPlayer, g->renderer, id);
+
+                /* placera i players-array på rätt index */
+                if (g->players[0] == g->localPlayer)
+                    g->players[0] = NULL;
+                g->players[id] = g->localPlayer;
+
+                /* skicka pos direkt */
+                SDL_Rect p = getPlayerPosition(g->localPlayer);
+                sendPlayerPosition(&g->netMgr, (float)p.x, (float)p.y,
+                                   getPlayerAngle(g->localPlayer));
             }
         }
-        
-        // Send position updates periodically to reduce network traffic
-        game->frameCounter++;
-        if (game->frameCounter >= UPDATE_RATE) {
-            game->frameCounter = 0;
-            
-            // Only send if we have a valid player ID
-            if (game->netMgr.localPlayerId != 0xFF) {
-                SDL_Rect pos = getPlayerPosition(game->localPlayer);
-                float angle = getPlayerAngle(game->localPlayer);
-                sendPlayerPosition(&game->netMgr, (float)pos.x, (float)pos.y, angle);
+
+        /* skicka egen pos mer sällan ----------------------- */
+        if (++g->frameCounter >= UPDATE_RATE) {
+            g->frameCounter = 0;
+            if (g->netMgr.localPlayerId != 0xFF) {
+                SDL_Rect p = getPlayerPosition(g->localPlayer);
+                sendPlayerPosition(&g->netMgr, (float)p.x, (float)p.y,
+                                   getPlayerAngle(g->localPlayer));
             }
         }
     }
-    
-    // Render frame
-    renderGame(game);
+
+    /* ----------- rendering ------------------------------- */
+    renderGame(g);
 }
 
-void handleInput(GameContext *game, SDL_Event *event) {
-    // Death screen interaction
-    if (!isPlayerAlive(game->localPlayer) && game->showDeathScreen) {
-        if (event->type == SDL_MOUSEBUTTONDOWN) {
-            int mouseX, mouseY;
-            SDL_GetMouseState(&mouseX, &mouseY);
-            
-            // Check if spectate button was clicked
-            if (mouseX >= game->spectateButtonRect.x && 
-                mouseX <= game->spectateButtonRect.x + game->spectateButtonRect.w &&
-                mouseY >= game->spectateButtonRect.y && 
-                mouseY <= game->spectateButtonRect.y + game->spectateButtonRect.h) {
-                
-                // Enable spectate mode
-                enableSpectateMode(game);
-            }
+/* ==========================================================
+ *                 INDATBEHANDLING
+ * ========================================================== */
+void handleInput(GameContext *g, SDL_Event *e)
+{
+    /* Om död-skärm aktiv → bara mus-klick */
+    if (!isPlayerAlive(g->localPlayer) && g->showDeathScreen) {
+        if (e->type == SDL_MOUSEBUTTONDOWN) {
+            int mx, my; SDL_GetMouseState(&mx, &my);
+            SDL_Rect r = g->spectateButtonRect;
+            if (mx >= r.x && mx <= r.x + r.w &&
+                my >= r.y && my <= r.y + r.h)
+                enableSpectateMode(g);
         }
-        return; // Don't process other input while on death screen
+        return;
     }
-    
-    if (event->type == SDL_KEYDOWN) {
-        switch (event->key.keysym.scancode) {
-            case SDL_SCANCODE_ESCAPE:
-                game->isRunning = false;
-                break;
-            case SDL_SCANCODE_W:
-            case SDL_SCANCODE_UP:
-                movePlayerUp(game->localPlayer);
-                break;
-            case SDL_SCANCODE_S:
-            case SDL_SCANCODE_DOWN:
-                movePlayerDown(game->localPlayer);
-                break;
-            case SDL_SCANCODE_A:
-            case SDL_SCANCODE_LEFT:
-                movePlayerLeft(game->localPlayer);
-                break;
-            case SDL_SCANCODE_D:
-            case SDL_SCANCODE_RIGHT:
-                movePlayerRight(game->localPlayer);
-                break;
-            case SDL_SCANCODE_SPACE:
-                // Only allow shooting if player is alive
-                if (isPlayerAlive(game->localPlayer)) {
-                    // Spawn the projectile and get its ID
-                    int projectileId = spawnProjectile(game->projectiles, game->localPlayer);
-                    
-                    // If projectile was spawned successfully
-                    if (projectileId >= 0 && game->isNetworked) {
-                        SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
-                        float angle = getPlayerAngle(game->localPlayer);
-                        float x = playerPos.x + playerPos.w / 2.0f;
-                        float y = playerPos.y + playerPos.h / 2.0f;
-                        
-                        // Factor in angle to place projectile outside the player
-                        float radians = angle * M_PI / 180.0f;
-                        float offsetDistance = 5.0f; // Minimal offset, matching spawn function
-                        x += cosf(radians) * offsetDistance;
-                        y += sinf(radians) * offsetDistance;
-                        
-                        // Send projectile data with projectile ID
-                        sendPlayerShoot(&game->netMgr, x, y, angle, projectileId);
-                        
-                        // Also send a position update immediately after shooting
-                        // This ensures spectators can still see the player
-                        sendPlayerPosition(&game->netMgr, (float)playerPos.x, (float)playerPos.y, angle);
-                    }
+
+    /* Vanliga spel-tangenter -------------------------------- */
+    if (e->type == SDL_KEYDOWN) {
+        switch (e->key.keysym.scancode) {
+        case SDL_SCANCODE_ESCAPE: g->isRunning = false; break;
+        case SDL_SCANCODE_W:
+        case SDL_SCANCODE_UP:    movePlayerUp   (g->localPlayer); break;
+        case SDL_SCANCODE_S:
+        case SDL_SCANCODE_DOWN:  movePlayerDown (g->localPlayer); break;
+        case SDL_SCANCODE_A:
+        case SDL_SCANCODE_LEFT:  movePlayerLeft (g->localPlayer); break;
+        case SDL_SCANCODE_D:
+        case SDL_SCANCODE_RIGHT: movePlayerRight(g->localPlayer); break;
+
+        case SDL_SCANCODE_SPACE:
+            if (isPlayerAlive(g->localPlayer)) {
+                int pid = spawnProjectile(g->projectiles, g->localPlayer);
+                if (pid >= 0 && g->isNetworked) {
+                    SDL_Rect p = getPlayerPosition(g->localPlayer);
+                    float ang = getPlayerAngle(g->localPlayer);
+                    float x = p.x + p.w / 2.0f;
+                    float y = p.y + p.h / 2.0f;
+                    float rad = ang * M_PI / 180.0f;
+                    x += cosf(rad) * 5.0f;
+                    y += sinf(rad) * 5.0f;
+                    sendPlayerShoot(&g->netMgr, x, y, ang, pid);
+
+                    sendPlayerPosition(&g->netMgr, (float)p.x, (float)p.y, ang);
                 }
-                break;
+            }
+            break;
+        default: break;
         }
-    } else if (event->type == SDL_KEYUP) {
-        switch (event->key.keysym.scancode) {
-            case SDL_SCANCODE_W:
-            case SDL_SCANCODE_UP:
-            case SDL_SCANCODE_S:
-            case SDL_SCANCODE_DOWN:
-                stopMovementVY(game->localPlayer);
-                break;
-            case SDL_SCANCODE_A:
-            case SDL_SCANCODE_LEFT:
-            case SDL_SCANCODE_D:
-            case SDL_SCANCODE_RIGHT:
-                stopMovementVX(game->localPlayer);
-                break;
+    }
+    else if (e->type == SDL_KEYUP) {
+        switch (e->key.keysym.scancode) {
+        case SDL_SCANCODE_W:
+        case SDL_SCANCODE_UP:
+        case SDL_SCANCODE_S:
+        case SDL_SCANCODE_DOWN:  stopMovementVY(g->localPlayer); break;
+        case SDL_SCANCODE_A:
+        case SDL_SCANCODE_LEFT:
+        case SDL_SCANCODE_D:
+        case SDL_SCANCODE_RIGHT: stopMovementVX(g->localPlayer); break;
+        default: break;
         }
     }
 }
 
-void updateGame(GameContext *game, float deltaTime) {
-    // Update local player
-    updatePlayer(game->localPlayer, deltaTime);
-    
-    // Prevent player from leaving the world boundaries
-    SDL_Rect playerRect = getPlayerPosition(game->localPlayer);
-    if (playerRect.x < 0 || playerRect.x + playerRect.w > WORLD_WIDTH ||
-        playerRect.y < 0 || playerRect.y + playerRect.h > WORLD_HEIGHT) {
-        revertToPreviousPosition(game->localPlayer);
-    }
-    
-    // Check for wall collisions
-    if (checkCollision(game->maze, playerRect)) {
-        revertToPreviousPosition(game->localPlayer);
-    }
-    
-    // Update projectiles with wall collision
-    updateProjectileWithWallCollision(game->projectiles, game->maze, deltaTime);
-    
-    // Check for projectile-player collisions
-    checkPlayerProjectileCollisions(game);
-    
-    // Update camera based on spectate mode
-    if (game->isSpectating) {
-        // In spectate mode, keep the camera centered on the maze
-        float mazeCenterX = (TILE_WIDTH * TILE_SIZE) / 2.0f;
-        float mazeCenterY = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
-        setCameraPosition(game->camera, mazeCenterX, mazeCenterY);
+/* ==========================================================
+ *                 SPEL-UPPDATERING
+ * ========================================================== */
+void updateGame(GameContext *g, float dt)
+{
+    updatePlayer(g->localPlayer, dt);
+
+    /* Håll spelaren inom världen */
+    SDL_Rect r = getPlayerPosition(g->localPlayer);
+    if (r.x < 0 || r.x + r.w > WORLD_WIDTH ||
+        r.y < 0 || r.y + r.h > WORLD_HEIGHT)
+        revertToPreviousPosition(g->localPlayer);
+
+    /* Kollision mot väggar */
+    if (checkCollision(g->maze, r))
+        revertToPreviousPosition(g->localPlayer);
+
+    /* Projektiler ----------------------------------------- */
+    updateProjectileWithWallCollision(g->projectiles, g->maze, dt);
+
+    /* Koll. projektil ↔ spelare */
+    checkPlayerProjectileCollisions(g);
+
+    /* Kamera ---------------------------------------------- */
+    if (g->isSpectating) {
+        float cx = (TILE_WIDTH  * TILE_SIZE) / 2.0f;
+        float cy = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
+        setCameraPosition(g->camera, cx, cy);
     } else {
-        // Normal camera following player
-        updateCamera(game->camera, game->localPlayer);
+        updateCamera(g->camera, g->localPlayer);
     }
 }
 
-void updatePlayerRotation(GameContext *game) {
-  
-    int mouseX, mouseY;
-    SDL_GetMouseState(&mouseX, &mouseY);
-    
- 
-    SDL_Rect playerPos = getPlayerPosition(game->localPlayer);
-    
-    SDL_Rect screenPlayerPos = getWorldCoordinatesFromCamera(game->camera, playerPos);
-    
-   
-    float playerCenterX = screenPlayerPos.x + screenPlayerPos.w / 2.0f;
-    float playerCenterY = screenPlayerPos.y + screenPlayerPos.h / 2.0f;
-    
-    // Calculate angle between player center and mouse
-    float deltaX = mouseX - playerCenterX;
-    float deltaY = mouseY - playerCenterY;
-    float radians = atan2f(deltaY, deltaX);
-    float angle = radians * 180.0f / 3.14;
-    
-    // Update player angle
-    setPlayerAngle(game->localPlayer, angle);
+/* ---------------------------------------------------------- */
+void updatePlayerRotation(GameContext *g)
+{
+    int mx, my; SDL_GetMouseState(&mx, &my);
+    SDL_Rect pr = getPlayerPosition(g->localPlayer);
+    SDL_Rect scr = getWorldCoordinatesFromCamera(g->camera, pr);
+
+    float pcx = scr.x + scr.w / 2.0f;
+    float pcy = scr.y + scr.h / 2.0f;
+
+    float dx = mx - pcx;
+    float dy = my - pcy;
+    float ang = atan2f(dy, dx) * 180.0f / (float)M_PI;
+    setPlayerAngle(g->localPlayer, ang);
 }
 
-void renderGame(GameContext *game) {
-    SDL_SetRenderDrawColor(game->renderer, 10, 10, 10, 255);
-    SDL_RenderClear(game->renderer);
-    
-    // Render the maze walls (pass spectate mode flag)
-    drawMap(game->maze, game->camera, game->localPlayer, game->isSpectating);
-    
-    // Render all players and projectiles
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (game->players[i]) {
-            drawPlayer(game->players[i], game->camera);
-        }
-    }
-    
-    // Draw projectiles
-    drawProjectile(game->projectiles, game->camera);
-    
-    // Render death screen if player is dead and not in spectate mode
-    if (!isPlayerAlive(game->localPlayer) && game->showDeathScreen) {
-        renderDeathScreen(game);
-    }
-    
-    SDL_RenderPresent(game->renderer);
+/* ==========================================================
+ *                 RENDERING
+ * ========================================================== */
+void renderGame(GameContext *g)
+{
+    SDL_SetRenderDrawColor(g->renderer, 10, 10, 10, 255);
+    SDL_RenderClear(g->renderer);
+
+    drawMap(g->maze, g->camera, g->localPlayer, g->isSpectating);
+
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+        if (g->players[i]) drawPlayer(g->players[i], g->camera);
+
+    drawProjectile(g->projectiles, g->camera);
+
+    if (!isPlayerAlive(g->localPlayer) && g->showDeathScreen)
+        renderDeathScreen(g);
+
+    SDL_RenderPresent(g->renderer);
 }
 
-void gameCoreShutdown(GameContext *game) {
-    // Clean up network resources if networked game
-    if (game->isNetworked) {
-        netShutdown();
-    }
-    
-    // Destroy all projectiles
-    destroyProjectile(game->projectiles);
-    
-    // Destroy local player
-    destroyPlayer(game->localPlayer);
-    
-    // Destroy other players (in networked games)
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (game->players[i] && game->players[i] != game->localPlayer) {
-            destroyPlayer(game->players[i]);
-        }
-    }
-    
-    // Destroy maze, camera and font texture
-    destroyMaze(game->maze);
-    destroyCamera(game->camera);
-    
-    // Destroy font texture
-    if (game->fontTexture) {
-        SDL_DestroyTexture(game->fontTexture);
-        game->fontTexture = NULL;
-    }
-    
-    // Destroy audio manager
-    if (game->audioManager) {
-        destroyAudioManager(game->audioManager);
-        game->audioManager = NULL;
-    }
+/* ==========================================================
+ *                 NEDSTÄNGNING
+ * ========================================================== */
+void gameCoreShutdown(GameContext *g)
+{
+    if (g->isNetworked) netShutdown();
+
+    destroyProjectile(g->projectiles);
+    destroyPlayer(g->localPlayer);
+    for (int i = 0; i < MAX_PLAYERS; ++i)
+        if (g->players[i] && g->players[i] != g->localPlayer)
+            destroyPlayer(g->players[i]);
+
+    destroyMaze(g->maze);
+    destroyCamera(g->camera);
+
+    if (g->fontTexture) SDL_DestroyTexture(g->fontTexture);
+
+    if (g->audioManager) destroyAudioManager(g->audioManager);
 }
 
-void gameOnNetworkMessage(GameContext *game, Uint8 type, Uint8 playerId, const void *data, int size) {
-    if (playerId >= MAX_PLAYERS) return;
-    
+/* ==========================================================
+ *                 NÄTVERKS-CALLBACK
+ * ========================================================== */
+void gameOnNetworkMessage(GameContext *g, Uint8 type, Uint8 id,
+                          const void *data, int size)
+{
+    if (id >= MAX_PLAYERS) return;
+
     switch (type) {
-        case MSG_JOIN: {
-            if (game->netMgr.localPlayerId == playerId) {
-                if (game->players[0] == game->localPlayer) {
-                    game->players[0] = NULL;
-                }
-                game->players[playerId] = game->localPlayer;
-            }
-            break;
+/* ---------------------------------------------------------- */
+    case MSG_JOIN:
+        if (g->netMgr.localPlayerId == id) {
+            if (g->players[0] == g->localPlayer) g->players[0] = NULL;
+            g->players[id] = g->localPlayer;
         }
-        case MSG_POS: {
-            if (size < 3.0 * sizeof(float)) return;
+        break;
 
-            float* posData = (float*)data;
-            float x = posData[0];
-            float y = posData[1];
-            float angle = posData[2];
-            
-            // skapa icke lokal spelare 
-            if (game->players[playerId] == NULL && playerId != game->netMgr.localPlayerId) {
-                game->players[playerId] = createPlayer(game->renderer);
-                if (!game->players[playerId]) return;
-                // Set texture for the newly created remote player
-                playerSetTextureById(game->players[playerId], game->renderer, playerId);
-                
-                // positions  of players
-                setPlayerPosition(game->players[playerId], x, y);
-                setPlayerAngle(game->players[playerId], angle);
-                
-                printf("Created remote player with ID %d\n", playerId);
-            }
-            
-            // Skip updating if it's our local player
-            if (playerId != game->netMgr.localPlayerId) {
-                // updatera spelaren
-                setPlayerPosition(game->players[playerId], x, y);
-                setPlayerAngle(game->players[playerId], angle);
-            }
-            break;
-        }
-        case MSG_SHOOT: {
-            if (size < 3.0 * sizeof(float) + sizeof(int)) return;
+/* ---------------------------------------------------------- */
+    case MSG_POS:
+        if (size < 3 * (int)sizeof(float)) return;
 
-            if (playerId == game->netMgr.localPlayerId) return;
-            
-            // Ensure remote player exists
-            if (game->players[playerId] == NULL) return;
-            
-            // Get projectile ID - properly cast data pointer to access int
-            const float* posData = (const float*)data;
-            int projectileId = *((const int*)(posData + 3));
-            
-            // Check if projectile ID is valid
-            if (projectileId < 0 || projectileId >= MAX_PROJECTILES) return;
-            
-            // Get position and angle data
-            float x = posData[0];
-            float y = posData[1];
-            float angle = posData[2];
-            
-            // Convert angle to radians
-            float radians = angle * M_PI / 180.0f;
-            
-            // Set projectile properties using accessor functions
-            setProjectileActive(game->projectiles[projectileId], true);
-            setProjectileOwner(game->projectiles[projectileId], game->players[playerId]);
-            setProjectilePosition(game->projectiles[projectileId], x, y);
-            setProjectileVelocity(
-                game->projectiles[projectileId], 
-                cosf(radians) * PROJSPEED, 
-                sinf(radians) * PROJSPEED
-            );
-            setProjectileDuration(game->projectiles[projectileId], 3.0f);  // 3 seconds duration
-            
-            break;
-        }
-        case MSG_LEAVE: {
-            
-                if (playerId != game->netMgr.localPlayerId && game->players[playerId]) {
-                destroyPlayer(game->players[playerId]);
-                game->players[playerId] = NULL;
+        if (id != g->netMgr.localPlayerId) {
+            if (!g->players[id]) {
+                g->players[id] = createPlayer(g->renderer);
+                if (!g->players[id]) return;
+                playerSetTextureById(g->players[id], g->renderer, id);
             }
-            break;
+            const float *p = (const float *)data;
+            setPlayerPosition(g->players[id], p[0], p[1]);
+            setPlayerAngle   (g->players[id], p[2]);
         }
-        case MSG_DEATH: {
-            if (size < sizeof(Uint8)) return;
-            
-            // Get the player who died
-            Player* deadPlayer = game->players[playerId];
-            if (!deadPlayer) return;
-            
-            // Only show death screen if it's the local player
-            if (deadPlayer == game->localPlayer) {
-                game->showDeathScreen = true;
-                
-                // Play death sound
-                if (game->audioManager) {
-                    playDeathSound(game->audioManager);
-                }
-            }
-            
-            // Kill the player
-            killPlayer(deadPlayer);
-            
-            printf("Player %d has died\n", playerId);
-            break;
+        break;
+
+/* ---------------------------------------------------------- */
+    case MSG_SHOOT:
+        if (size < 3 * (int)sizeof(float) + (int)sizeof(int)) return;
+        if (id == g->netMgr.localPlayerId) return;
+        if (!g->players[id]) return;
+
+        {
+            const float *p = (const float *)data;
+            int pid = *((const int *)(p + 3));
+            if (pid < 0 || pid >= MAX_PROJECTILES) return;
+
+            float x = p[0], y = p[1], ang = p[2];
+            float rad = ang * M_PI / 180.0f;
+
+            setProjectileActive(g->projectiles[pid], true);
+            setProjectileOwner (g->projectiles[pid], g->players[id]);
+            setProjectilePosition(g->projectiles[pid], x, y);
+            setProjectileVelocity(g->projectiles[pid],
+                                  cosf(rad) * PROJSPEED,
+                                  sinf(rad) * PROJSPEED);
+            setProjectileDuration(g->projectiles[pid], 3.0f);
         }
+        break;
+
+/* ---------------------------------------------------------- */
+    case MSG_LEAVE:
+        if (id != g->netMgr.localPlayerId && g->players[id]) {
+            destroyPlayer(g->players[id]);
+            g->players[id] = NULL;
+        }
+        break;
+
+/* ---------------------------------------------------------- */
+    case MSG_DEATH:
+        if (size < (int)sizeof(Uint8)) return;
+        if (!g->players[id]) return;
+
+        if (g->players[id] == g->localPlayer) {
+            g->showDeathScreen = true;
+            if (g->audioManager) playDeathSound(g->audioManager);
+        }
+        killPlayer(g->players[id]);
+        break;
+
+/* ---------------------------------------------------------- */
+    case MSG_START:
+        g->lobbyReceivedStart = true;   /* används av lobby-koden */
+        break;
     }
 }
 
-// Check for collisions between projectiles and players
-void checkPlayerProjectileCollisions(GameContext *game) {
-    // For each projectile, check collision with all players
-    for (int i = 0; i < MAX_PROJECTILES; i++) {
-        if (game->projectiles[i] && isProjectileActive(game->projectiles[i])) {
-            
-            // Check collision with the local player
-            if (isPlayerAlive(game->localPlayer) && 
-                checkProjectilePlayerCollision(game->projectiles[i], game->localPlayer)) {
-                // Kill player
-                killPlayer(game->localPlayer);
-                // Deactivate projectile
-                deactivateProjectile(game->projectiles[i]);
-                // Show death screen
-                game->showDeathScreen = true;
-                
-                // Play death sound
-                if (game->audioManager) {
-                    playDeathSound(game->audioManager);
+/* ==========================================================
+ *             KOLLISION: PROJ ↔ SPELARE
+ * ========================================================== */
+static void checkPlayerProjectileCollisions(GameContext *g)
+{
+    for (int i = 0; i < MAX_PROJECTILES; ++i)
+        if (isProjectileActive(g->projectiles[i])) {
+
+            /* mot lokal spelare ---------------------------- */
+            if (isPlayerAlive(g->localPlayer) &&
+                checkProjectilePlayerCollision(g->projectiles[i],
+                                               g->localPlayer)) {
+                killPlayer(g->localPlayer);
+                deactivateProjectile(g->projectiles[i]);
+                g->showDeathScreen = true;
+                if (g->audioManager) playDeathSound(g->audioManager);
+
+                if (g->isNetworked) {
+                    Player *killer = getProjectileOwner(g->projectiles[i]);
+                    Uint8 killerId = 0xFF;
+                    for (int j = 0; j < MAX_PLAYERS; ++j)
+                        if (g->players[j] == killer) { killerId = j; break; }
+                    sendPlayerDeath(&g->netMgr, killerId);
                 }
-                
-                // Send death message if networked game
-                if (game->isNetworked) {
-                    // Get the player ID who killed this player
-                    Player* killerPlayer = getProjectileOwner(game->projectiles[i]);
-                    Uint8 killerPlayerId = 0xFF; // Default to invalid ID
-                    
-                    // Find the player ID of the killer
-                    for (int j = 0; j < MAX_PLAYERS; j++) {
-                        if (game->players[j] == killerPlayer) {
-                            killerPlayerId = j;
-                            break;
-                        }
+            }
+
+            /* mot fjärr-spelare ---------------------------- */
+            if (g->isNetworked)
+                for (int j = 0; j < MAX_PLAYERS; ++j)
+                    if (g->players[j] && g->players[j] != g->localPlayer &&
+                        isPlayerAlive(g->players[j]) &&
+                        checkProjectilePlayerCollision(g->projectiles[i],
+                                                       g->players[j])) {
+
+                        killPlayer(g->players[j]);
+                        deactivateProjectile(g->projectiles[i]);
                     }
-                    
-                    // Send death notification
-                    sendPlayerDeath(&game->netMgr, killerPlayerId);
-                }
-            }
-            
-            // Check collision with other players in networked games
-            if (game->isNetworked) {
-                for (int j = 0; j < MAX_PLAYERS; j++) {
-                    if (game->players[j] && game->players[j] != game->localPlayer && 
-                        isPlayerAlive(game->players[j]) && 
-                        checkProjectilePlayerCollision(game->projectiles[i], game->players[j])) {
-                        // Kill the player
-                        killPlayer(game->players[j]);
-                        // Deactivate projectile
-                        deactivateProjectile(game->projectiles[i]);
-                        
-                        // We don't show death screen for other players
-                        // We also don't need to send network messages for remote player collisions 
-                        // as those will be handled by the player's own client
-                    }
-                }
-            }
         }
-    }
 }
 
-// Initialize the death screen
-void initDeathScreen(GameContext *game) {
-    int buttonWidth = 200;
-    int buttonHeight = 50;
-    
-    // Center the spectate button on screen
-    game->spectateButtonRect.x = (WINDOW_WIDTH / 2) - (buttonWidth / 2);
-    game->spectateButtonRect.y = (WINDOW_HEIGHT / 2) + 50; // Position below "YOU DIED" text
-    game->spectateButtonRect.w = buttonWidth;
-    game->spectateButtonRect.h = buttonHeight;
+/* ==========================================================
+ *             DÖD-SKÄRM & SPECTATE
+ * ========================================================== */
+static void initDeathScreen(GameContext *g)
+{
+    int bw = 200, bh = 50;
+    g->spectateButtonRect =
+        (SDL_Rect){WINDOW_WIDTH / 2 - bw / 2,
+                   WINDOW_HEIGHT / 2 + 50, bw, bh};
 }
 
-// Render the death screen
-void renderDeathScreen(GameContext *game) {
-    SDL_Renderer *renderer = game->renderer;
-    
-    // Draw semi-transparent black overlay
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180); // Semi-transparent black
-    SDL_Rect fullScreen = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
-    SDL_RenderFillRect(renderer, &fullScreen);
-    
-    // Draw "YOU DIED" text
-    if (game->fontTexture) {
-        SDL_Rect textRect = {
-            (WINDOW_WIDTH / 2) - 150, // Center horizontally
-            (WINDOW_HEIGHT / 2) - 50, // Position at center
-            300, // Width of text
-            80   // Height of text
-        };
-        
-        // Set text to be tinted red
-        SDL_SetTextureColorMod(game->fontTexture, 255, 0, 0);
-        SDL_RenderCopy(renderer, game->fontTexture, NULL, &textRect);
+static void renderDeathScreen(GameContext *g)
+{
+    SDL_Renderer *r = g->renderer;
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 180);
+    SDL_RenderFillRect(r, &(SDL_Rect){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT});
+
+    if (g->fontTexture) {
+        SDL_Rect tr = {WINDOW_WIDTH / 2 - 150, WINDOW_HEIGHT / 2 - 50,
+                       300, 80};
+        SDL_SetTextureColorMod(g->fontTexture, 255, 0, 0);
+        SDL_RenderCopy(r, g->fontTexture, NULL, &tr);
     }
-    
-    // Draw spectate button
-    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); // Gray button
-    SDL_RenderFillRect(renderer, &game->spectateButtonRect);
-    
-    // Draw button border
-    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); // Light gray border
-    SDL_RenderDrawRect(renderer, &game->spectateButtonRect);
-    
-    // Render "SPECTATE" text on the button
-    TTF_Font* buttonFont = TTF_OpenFont("resources/font.ttf", 28);
-    if (buttonFont) {
-        SDL_Color textColor = {255, 255, 255, 255}; // White text
-        SDL_Surface* buttonTextSurface = TTF_RenderText_Blended(buttonFont, "SPECTATE", textColor);
-        if (buttonTextSurface) {
-            SDL_Texture* buttonTextTexture = SDL_CreateTextureFromSurface(renderer, buttonTextSurface);
-            if (buttonTextTexture) {
-                // Center the text on the button
-                SDL_Rect buttonTextRect = {
-                    game->spectateButtonRect.x + (game->spectateButtonRect.w - buttonTextSurface->w) / 2,
-                    game->spectateButtonRect.y + (game->spectateButtonRect.h - buttonTextSurface->h) / 2,
-                    buttonTextSurface->w,
-                    buttonTextSurface->h
-                };
-                SDL_RenderCopy(renderer, buttonTextTexture, NULL, &buttonTextRect);
-                SDL_DestroyTexture(buttonTextTexture);
-            }
-            SDL_FreeSurface(buttonTextSurface);
+
+    SDL_SetRenderDrawColor(r, 100, 100, 100, 255);
+    SDL_RenderFillRect(r, &g->spectateButtonRect);
+    SDL_SetRenderDrawColor(r, 200, 200, 200, 255);
+    SDL_RenderDrawRect(r, &g->spectateButtonRect);
+
+    TTF_Font *f = TTF_OpenFont("resources/font.ttf", 28);
+    if (f) {
+        SDL_Surface *s = TTF_RenderText_Blended(
+            f, "SPECTATE", (SDL_Color){255, 255, 255, 255});
+        if (s) {
+            SDL_Texture *t = SDL_CreateTextureFromSurface(r, s);
+            SDL_Rect dst = {g->spectateButtonRect.x +
+                                (g->spectateButtonRect.w - s->w) / 2,
+                            g->spectateButtonRect.y +
+                                (g->spectateButtonRect.h - s->h) / 2,
+                            s->w, s->h};
+            SDL_RenderCopy(r, t, NULL, &dst);
+            SDL_DestroyTexture(t);
+            SDL_FreeSurface(s);
         }
-        TTF_CloseFont(buttonFont);
+        TTF_CloseFont(f);
     }
 }
 
-// Enable spectate mode
-void enableSpectateMode(GameContext *game) {
-    game->isSpectating = true;
-    game->showDeathScreen = false;
-    
-    // Set camera to spectate mode
-    setCameraSpectateMode(game->camera, true);
-    
-    // Center camera on the maze (not the world)
-    // Calculate maze center: (TILE_WIDTH * TILE_SIZE / 2, TILE_HEIGHT * TILE_SIZE / 2)
-    float mazeCenterX = (TILE_WIDTH * TILE_SIZE) / 2.0f;
-    float mazeCenterY = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
-    setCameraPosition(game->camera, mazeCenterX, mazeCenterY);
-} 
+static void enableSpectateMode(GameContext *g)
+{
+    g->isSpectating   = true;
+    g->showDeathScreen = false;
+    setCameraSpectateMode(g->camera, true);
+
+    float cx = (TILE_WIDTH  * TILE_SIZE) / 2.0f;
+    float cy = (TILE_HEIGHT * TILE_SIZE) / 2.0f;
+    setCameraPosition(g->camera, cx, cy);
+}

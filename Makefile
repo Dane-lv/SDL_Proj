@@ -63,7 +63,8 @@ CORE_SOURCES = $(SRCDIR)/game_core.c \
                $(SRCDIR)/network.c \
                $(SRCDIR)/camera.c \
                $(SRCDIR)/menu.c \
-               $(SRCDIR)/audio_manager.c
+               $(SRCDIR)/audio_manager.c \
+               $(SRCDIR)/lobby.c 
 
 GAME_SOURCES = $(SRCDIR)/client.c $(CORE_SOURCES)
 
