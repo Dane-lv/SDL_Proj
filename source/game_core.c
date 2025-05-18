@@ -322,9 +322,48 @@ void renderGame(GameContext *g)
 
     drawMap(g->maze, g->camera, g->localPlayer, g->isSpectating);
 
-    for (int i = 0; i < MAX_PLAYERS; ++i)
-        if (g->players[i]) drawPlayer(g->players[i], g->camera);
+    for (int i = 0; i < MAX_PLAYERS; ++i) {
+        Player *p = g->players[i];
+        if (!p) continue;
 
+        /* Host-/lokal spelare eller spectate → rita fullt */
+        if (p == g->localPlayer || g->isSpectating) {
+            drawPlayer(p, g->camera);
+            continue;
+        }
+
+        /* ljus-faktor (samma formel som i drawMap) */
+        SDL_Rect lr = getPlayerPosition(g->localPlayer);
+        SDL_Rect pr = getPlayerPosition(p);
+
+        float lcx = lr.x + lr.w * 0.5f;
+        float lcy = lr.y + lr.h * 0.5f;
+        float pcx = pr.x + pr.w * 0.5f;
+        float pcy = pr.y + pr.h * 0.5f;
+        float dx  = pcx - lcx;
+        float dy  = pcy - lcy;
+        float dist = sqrtf(dx*dx + dy*dy);
+
+        float t = 1.f - dist / PLAYER_VISUAL_DIST;
+        if (t < 0.f) t = 0.f;
+        float b = FOG_MIN_BRIGHTNESS + t * (1.f - FOG_MIN_BRIGHTNESS);
+
+        /* modulerar texturen               -------- NYTT -------- */
+        SDL_Texture *tex = getPlayerTexture(p);
+        if (tex) {
+            Uint8 mod = (Uint8)(255.f * b);
+            SDL_SetTextureColorMod(tex, mod, mod, mod);
+            SDL_SetTextureAlphaMod(tex, mod);
+        }
+
+        drawPlayer(p, g->camera);
+
+        /* återställ mod                -------- NYTT -------- */
+        if (tex) {
+            SDL_SetTextureColorMod(tex, 255, 255, 255);
+            SDL_SetTextureAlphaMod(tex, 255);
+        }
+    }
     drawProjectile(g->projectiles, g->camera);
 
     if (!isPlayerAlive(g->localPlayer) && g->showDeathScreen)

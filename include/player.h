@@ -21,6 +21,7 @@ void stopMovementVX(Player *pPlayer);
 SDL_Rect getPlayerPosition(Player *pPlayer);
 SDL_Texture *getPlayerTexture(Player *pPlayer);
 
+
 SDL_Rect getPlayerRect(Player *pPlayer);
 void setPlayerPosition(Player *pPlayer, float x, float y);
 void setPlayerAngle(Player *pPlayer, float angle);
