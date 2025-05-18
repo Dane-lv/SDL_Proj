@@ -48,7 +48,7 @@ txt(SDL_Renderer *r,TTF_Font *f,const char *s,SDL_Color col,int *w,int *h)
     SDL_FreeSurface(surf); return t;
 }
 /* ---------------- slider-helpers ------------------------- */
-static struct slider mkSlider(int x,int y,int w,int h,
+static struct slider createSlider(int x,int y,int w,int h,
                               const char *lbl,int v)
 {
     struct slider s;
@@ -90,9 +90,19 @@ Menu *menuCreate(SDL_Renderer *r,SDL_Window *w,GameContext *ctx)
     m->btn[1].label="JOIN GAME";
     m->btn[2].label="SETTINGS";
 
-    int sw=400,sh=20, sx=winW/2-sw/2, sy1=winH/2-60, sy2=winH/2+30;
-    m->musicSlider=mkSlider(sx,sy1,sw,sh,"Music Volume",96);
-    m->sfxSlider  =mkSlider(sx,sy2,sw,sh,"SFX Volume",96);
+    int curMusic = Mix_VolumeMusic(-1);   /* nuvarande musikvolym 0-128   */
+    int curSfx   = Mix_Volume(-1, -1);    /* nuvarande SFX-volym  0-128   */
+    int sliderWidth  = 400;
+    int sliderHeight = 20;
+    int sliderX  = winW / 2 - sliderWidth / 2;
+    int sliderY1 = winH / 2 - 60;   /* musik-slider */
+    int sliderY2 = winH / 2 + 30;   /* sfx-slider   */
+
+    /* skapa sliders med rätt startvärden */
+    m->musicSlider = createSlider(sliderX, sliderY1, sliderWidth, sliderHeight,
+                                  "Music Volume", curMusic);
+    m->sfxSlider   = createSlider(sliderX, sliderY2, sliderWidth, sliderHeight,
+                                  "SFX Volume",   curSfx);
 
     m->backBtn.rect=(SDL_Rect){winW/2-100,winH/2+120,200,50};
     m->backBtn.label="BACK";
