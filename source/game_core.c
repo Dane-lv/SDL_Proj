@@ -19,9 +19,6 @@
 /* hur ofta lokala positioner pushas ut på nätet */
 #define UPDATE_RATE 10        /* var 10:e bildruta */
 
-/* ----------------------------------------------------------
- *  Främst privata hjälp-prototyper
- * ---------------------------------------------------------- */
 static void setWindowTitle     (GameContext *, const char *);
 static void initDeathScreen    (GameContext *);
 static void renderDeathScreen  (GameContext *);
@@ -108,6 +105,31 @@ bool gameInit(GameContext *g)
 /* ==========================================================
  *                 HUVUD-LOOP (en bildruta)
  * ========================================================== */
+
+ void startPosForId(int id, float *x, float *y)
+{
+    const float M = 50.f;                    /* marginal mot yttervägg */
+
+    switch (id)
+    {
+        case 0:  *x = M; *y = M;                                   break; /* TL */
+        case 1:  *x = WORLD_WIDTH  - PLAYERWIDTH  - M;
+                 *y = M;                                           break; /* TR */
+        case 2:  *x = M;
+                 *y = WORLD_HEIGHT - PLAYERHEIGHT - M;             break; /* BL */
+        case 3:  *x = WORLD_WIDTH  - PLAYERWIDTH  - M;
+                 *y = WORLD_HEIGHT - PLAYERHEIGHT - M;             break; /* BR */
+
+        /* Spelare 5 (ID 4) – garanterad golvyta strax under mitten */
+        case 4:  *x = WORLD_WIDTH  * 0.5f - PLAYERWIDTH  * 0.5f + TILE_SIZE+2;
+                 *y = WORLD_HEIGHT * 0.5f - PLAYERHEIGHT * 0.5f
+                       + 2 * TILE_SIZE;                            break;
+
+        default: /* fallback om MAX_PLAYERS höjs någon gång */
+                 *x = 100.f + id * 40.f;
+                 *y = 100.f;                                       break;
+    }
+}
 void gameCoreRunFrame(GameContext *g)
 {
     static Uint32 lastTime = 0;
@@ -139,41 +161,25 @@ void gameCoreRunFrame(GameContext *g)
             hostTick(&g->netMgr, g);
         else {
             clientTick(&g->netMgr, g);
+            if (!initialClientPosSet && g->netMgr.localPlayerId != 0xFF) 
+            {
 
-            /* när klient fått giltigt ID → ge start-position */
-            if (!initialClientPosSet && g->netMgr.localPlayerId != 0xFF) {
-                float x, y, margin = 50.0f;
-                Uint8 id = g->netMgr.localPlayerId;
+                float sx, sy;                       /* --- NYTT --- */
+                startPosForId(g->netMgr.localPlayerId, &sx, &sy);
+                setPlayerPosition(g->localPlayer, sx, sy);
 
-                if (id == 1) {                 /* Top-Right */
-                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
-                    y = margin;
-                } else if (id == 2) {          /* Bottom-Left */
-                    x = margin;
-                    y = WORLD_HEIGHT - 2 * PLAYERHEIGHT - margin;
-                } else if (id == 3) {          /* Bottom-Right */
-                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
-                    y = WORLD_HEIGHT - PLAYERHEIGHT - margin;
-                } else {                       /* id == 4 eller fler */
-                    x = WORLD_WIDTH  / 2.0f - PLAYERWIDTH  / 2.0f;
-                    y = WORLD_HEIGHT / 2.0f - PLAYERHEIGHT / 2.0f;
-                }
-
-                setPlayerPosition(g->localPlayer, x, y);
                 initialClientPosSet = true;
 
-                /* egen textur */
-                playerSetTextureById(g->localPlayer, g->renderer, id);
+                playerSetTextureById(g->localPlayer, g->renderer,
+                                     g->netMgr.localPlayerId);
 
-                /* placera i players-array på rätt index */
-                if (g->players[0] == g->localPlayer)
-                    g->players[0] = NULL;
-                g->players[id] = g->localPlayer;
+                if (g->players[0] == g->localPlayer) g->players[0] = NULL;
+                g->players[g->netMgr.localPlayerId] = g->localPlayer;
 
-                /* skicka pos direkt */
                 SDL_Rect p = getPlayerPosition(g->localPlayer);
                 sendPlayerPosition(&g->netMgr, (float)p.x, (float)p.y,
                                    getPlayerAngle(g->localPlayer));
+            
             }
         }
 

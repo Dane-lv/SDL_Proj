@@ -54,6 +54,7 @@ void  handleInput(GameContext *,SDL_Event *);
 void  updateGame(GameContext *,float dt);
 void  updatePlayerRotation(GameContext *);
 void  renderGame(GameContext *);
+void startPosForId(int id, float *x, float *y);
 
 /*  nätverks-callback                                        */
 void  gameOnNetworkMessage(GameContext *,Uint8 type,Uint8 pid,
