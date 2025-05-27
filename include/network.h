@@ -4,10 +4,9 @@
 #include <SDL.h>
 #include <SDL_net.h>
 #include <stdbool.h>
-#include "constants.h"          /* MAX_PLAYERS */
-
-/* -------- Meddelandetyper -------------------------------- */
-enum {
+#include "constants.h"
+enum
+{
     MSG_JOIN = 1,
     MSG_POS,
     MSG_SHOOT,
@@ -19,40 +18,38 @@ enum {
 
 #define BUF_SIZE 1024
 
-typedef struct {
-    Uint8  type;
-    Uint8  playerId;
+typedef struct
+{
+    Uint8 type;
+    Uint8 playerId;
     Uint16 size;
 } MessageHeader;
 
-typedef struct NetMgr {
-    TCPsocket      server;
-    TCPsocket      client;
-    TCPsocket      peers[MAX_PLAYERS];
-    int            peerCount;        /* = antal klienter (ej hosten)    */
+typedef struct NetMgr
+{
+    TCPsocket server;
+    TCPsocket client;
+    TCPsocket peers[MAX_PLAYERS];
+    int peerCount;
     SDLNet_SocketSet set;
-    char           buf[BUF_SIZE];
-    bool           isHost;
-    Uint8          localPlayerId;
-    void          *userData;         /* pekare till GameContext         */
+    char buf[BUF_SIZE];
+    bool isHost;
+    Uint8 localPlayerId;
+    void *userData;
 } NetMgr;
 
-/* init / nedstängning */
-bool  netInit(void);
-void  netShutdown(void);
+bool netInit(void);
+void netShutdown(void);
 
-/* host-API */
-bool  hostStart (NetMgr *nm, int port);
-void  hostTick  (NetMgr *nm, void *game);
+bool hostStart(NetMgr *nm, int port);
+void hostTick(NetMgr *nm, void *game);
 
-/* klient-API */
-bool  clientConnect(NetMgr *nm, const char *ip, int port);
-void  clientTick  (NetMgr *nm, void *game);
+bool clientConnect(NetMgr *nm, const char *ip, int port);
+void clientTick(NetMgr *nm, void *game);
 
-/* skicka händelser */
-bool  sendPlayerPosition(NetMgr *nm, float x, float y, float angle);
-bool  sendPlayerShoot   (NetMgr *nm, float x, float y, float angle, int pid);
-bool  sendPlayerDeath   (NetMgr *nm, Uint8 killerId);
-bool  sendStartGame     (NetMgr *nm);
+bool sendPlayerPosition(NetMgr *nm, float x, float y, float angle);
+bool sendPlayerShoot(NetMgr *nm, float x, float y, float angle, int pid);
+bool sendPlayerDeath(NetMgr *nm, Uint8 killerId);
+bool sendStartGame(NetMgr *nm);
 
-#endif /* NETWORK_H */
+#endif

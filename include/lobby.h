@@ -7,15 +7,13 @@
 
 typedef struct lobby Lobby;
 
-/* isHost → visar även START-knapp */
-Lobby *lobbyCreate (SDL_Renderer *r, SDL_Window *w,
-                    GameContext *ctx, bool isHost);
-void   lobbyDestroy(Lobby *l);
+Lobby *lobbyCreate(SDL_Renderer *r, SDL_Window *w,
+                   GameContext *ctx, bool isHost);
+void lobbyDestroy(Lobby *l);
 
-bool   lobbyHandleEvent (Lobby *l, const SDL_Event *e);
-void   lobbyRender      (Lobby *l);
+bool lobbyHandleEvent(Lobby *l, const SDL_Event *e);
+void lobbyRender(Lobby *l);
 
-bool   lobbyIsReady     (const Lobby *l);   /* host har tryckt START   */
-bool   lobbyBackPressed (const Lobby *l);   /* någon har tryckt BACK   */
-
-#endif /* LOBBY_H */
+bool lobbyIsReady(const Lobby *l);
+bool lobbyBackPressed(const Lobby *l);
+#endif

@@ -19,21 +19,15 @@ void stopMovementVY(Player *pPlayer);
 void stopMovementVX(Player *pPlayer);
 
 SDL_Rect getPlayerPosition(Player *pPlayer);
-SDL_Texture *getPlayerTexture(Player *pPlayer);
-
 SDL_Rect getPlayerRect(Player *pPlayer);
 void setPlayerPosition(Player *pPlayer, float x, float y);
 void setPlayerAngle(Player *pPlayer, float angle);
 float getPlayerAngle(Player *pPlayer);
-float getGunTipPosX(Player *pPlayer);
-float getGunTipPosY(Player *pPlayer);
 void revertToPreviousPosition(Player *pPlayer);
 
 void playerSetTextureById(Player *pPlayer, SDL_Renderer *pRenderer, int playerId);
 
 bool isPlayerAlive(Player *pPlayer);
 void killPlayer(Player *pPlayer);
-void resetPlayer(Player *pPlayer);
 
-
-#endif 
+#endif

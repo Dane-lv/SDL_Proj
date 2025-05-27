@@ -5,7 +5,8 @@
 #include <stdbool.h>
 #include "game_core.h"
 
-typedef enum {
+typedef enum
+{
     MENU_CHOICE_NONE,
     MENU_CHOICE_HOST,
     MENU_CHOICE_JOIN,
@@ -14,11 +15,11 @@ typedef enum {
 
 typedef struct menu Menu;
 
-Menu        *menuCreate (SDL_Renderer *,SDL_Window *,GameContext *);
-void         menuDestroy(Menu *);
-bool         menuHandleEvent(Menu *,const SDL_Event *);
-void         menuRender(Menu *);
-MenuChoice   menuGetChoice(const Menu *);
-const char  *menuGetJoinIP(const Menu *);
+Menu *menuCreate(SDL_Renderer *, SDL_Window *, GameContext *);
+void menuDestroy(Menu *);
+bool menuHandleEvent(Menu *, const SDL_Event *);
+void menuRender(Menu *);
+MenuChoice menuGetChoice(const Menu *);
+const char *menuGetJoinIP(const Menu *);
 
 #endif
