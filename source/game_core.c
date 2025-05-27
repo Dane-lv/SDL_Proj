@@ -16,11 +16,16 @@
 #include "../include/network.h"
 #include "../include/audio_manager.h"
 
-#define UPDATE_RATE 10
-static void setWindowTitle(GameContext *, const char *);
-static void initDeathScreen(GameContext *);
-static void renderDeathScreen(GameContext *);
-static void enableSpectateMode(GameContext *);
+/* hur ofta lokala positioner pushas ut på nätet */
+#define UPDATE_RATE 10        /* var 10:e bildruta */
+
+/* ----------------------------------------------------------
+ *  Främst privata hjälp-prototyper
+ * ---------------------------------------------------------- */
+static void setWindowTitle     (GameContext *, const char *);
+static void initDeathScreen    (GameContext *);
+static void renderDeathScreen  (GameContext *);
+static void enableSpectateMode (GameContext *);
 static void checkPlayerProjectileCollisions(GameContext *);
 
 static void setWindowTitle(GameContext *g, const char *title)
@@ -106,6 +111,9 @@ bool gameInit(GameContext *g)
     return true;
 }
 
+/* ==========================================================
+ *                 HUVUD-LOOP (en bildruta)
+ * ========================================================== */
 void gameCoreRunFrame(GameContext *g)
 {
     static Uint32 lastTime = 0;
@@ -141,37 +149,32 @@ void gameCoreRunFrame(GameContext *g)
         {
             clientTick(&g->netMgr, g);
 
-            if (!initialClientPosSet && g->netMgr.localPlayerId != 0xFF)
-            {
+            /* när klient fått giltigt ID → ge start-position */
+            if (!initialClientPosSet && g->netMgr.localPlayerId != 0xFF) {
                 float x, y, margin = 50.0f;
                 Uint8 id = g->netMgr.localPlayerId;
 
-                if (id == 1)
-                {
-                    x = WORLD_WIDTH - PLAYERWIDTH - margin;
+                if (id == 1) {                 /* Top-Right */
+                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
                     y = margin;
-                }
-                else if (id == 2)
-                {
+                } else if (id == 2) {          /* Bottom-Left */
                     x = margin;
                     y = WORLD_HEIGHT - 2 * PLAYERHEIGHT - margin;
-                }
-                else if (id == 3)
-                {
-                    x = WORLD_WIDTH - PLAYERWIDTH - margin;
+                } else if (id == 3) {          /* Bottom-Right */
+                    x = WORLD_WIDTH  - PLAYERWIDTH  - margin;
                     y = WORLD_HEIGHT - PLAYERHEIGHT - margin;
-                }
-                else
-                {
-                    x = WORLD_WIDTH / 2.0f - PLAYERWIDTH / 2.0f;
+                } else {                       /* id == 4 eller fler */
+                    x = WORLD_WIDTH  / 2.0f - PLAYERWIDTH  / 2.0f;
                     y = WORLD_HEIGHT / 2.0f - PLAYERHEIGHT / 2.0f;
                 }
 
                 setPlayerPosition(g->localPlayer, x, y);
                 initialClientPosSet = true;
 
+                /* egen textur */
                 playerSetTextureById(g->localPlayer, g->renderer, id);
 
+                /* placera i players-array på rätt index */
                 if (g->players[0] == g->localPlayer)
                     g->players[0] = NULL;
                 g->players[id] = g->localPlayer;
@@ -179,6 +182,7 @@ void gameCoreRunFrame(GameContext *g)
                 SDL_Rect p = getPlayerPosition(g->localPlayer);
                 sendPlayerPosition(&g->netMgr, (float)p.x, (float)p.y,
                                    getPlayerAngle(g->localPlayer));
+            
             }
         }
 
@@ -334,8 +338,7 @@ void renderGame(GameContext *g)
     drawMap(g->maze, g->camera, g->localPlayer, g->isSpectating);
 
     for (int i = 0; i < MAX_PLAYERS; ++i)
-        if (g->players[i])
-            drawPlayer(g->players[i], g->camera);
+        if (g->players[i]) drawPlayer(g->players[i], g->camera);
 
     drawProjectile(g->projectiles, g->camera);
 
