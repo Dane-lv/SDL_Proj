@@ -56,8 +56,8 @@ txt(SDL_Renderer *r, TTF_Font *f, const char *s, SDL_Color col, int *w, int *h)
     return t;
 }
 /* ---------------- slider-helpers ------------------------- */
-static struct slider mkSlider(int x,int y,int w,int h,
-                              const char *lbl,int v)
+static struct slider mkSlider(int x, int y, int w, int h,
+                              const char *lbl, int v)
 {
     struct slider s;
     s.track = (SDL_Rect){x, y, w, h};
@@ -104,9 +104,9 @@ Menu *menuCreate(SDL_Renderer *r, SDL_Window *w, GameContext *ctx)
     m->btn[1].label = "JOIN GAME";
     m->btn[2].label = "SETTINGS";
 
-    int sw=400,sh=20, sx=winW/2-sw/2, sy1=winH/2-60, sy2=winH/2+30;
-    m->musicSlider=mkSlider(sx,sy1,sw,sh,"Music Volume",96);
-    m->sfxSlider  =mkSlider(sx,sy2,sw,sh,"SFX Volume",96);
+    int sw = 400, sh = 20, sx = winW / 2 - sw / 2, sy1 = winH / 2 - 60, sy2 = winH / 2 + 30;
+    m->musicSlider = mkSlider(sx, sy1, sw, sh, "Music Volume", 96);
+    m->sfxSlider = mkSlider(sx, sy2, sw, sh, "SFX Volume", 96);
 
     m->backBtn.rect = (SDL_Rect){winW / 2 - 100, winH / 2 + 120, 200, 50};
     m->backBtn.label = "BACK";
